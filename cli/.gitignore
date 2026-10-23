@@ -3,8 +3,8 @@
 # Binaries
 bin/
 dist/
-faciqor
-faciqor.exe
+/faciqor
+/faciqor.exe
 
 # Go test and coverage artifacts
 *.test
