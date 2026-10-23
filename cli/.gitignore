@@ -1,0 +1,12 @@
+# Go CLI .gitignore
+
+# Binaries
+bin/
+dist/
+faciqor
+faciqor.exe
+
+# Go test and coverage artifacts
+*.test
+*.out
+coverage.txt

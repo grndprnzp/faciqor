@@ -1,0 +1,25 @@
+# Root .gitignore for Faciqor Monorepo
+
+# Operating System & Editor Files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Environment variables & local secrets
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Protocol Buffers / Buf cache
+.buf/

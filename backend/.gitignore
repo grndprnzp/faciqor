@@ -1,0 +1,19 @@
+# Elixir / Phoenix .gitignore
+
+# Dependencies & Build artifacts
+/_build/
+/deps/
+*.beam
+
+# Static assets build output & node modules
+/priv/static/cache_manifest.json
+/assets/node_modules/
+
+# Phoenix temporary files & crash dumps
+erl_crash.dump
+*.dump
+
+# Test coverage & Dialyzer
+/cover/
+*.dialyzer_plt
+*.dialyzer_plt.hash
