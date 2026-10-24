@@ -33,7 +33,10 @@ faciqor/
 │   │   └── 0003-flutter-offline-sync.md
 │   ├── requirements/               # Anforderungskataloge (FA-01 bis FA-06, NFA-01 bis NFA-04)
 │   ├── compliance/                 # BetrKV-, GEFMA- und GoBD-Spezifikationen
-│   └── project_layout_reference.md # DIESES DOKUMENT
+│   └── architecture_and_projectfolder_layout.md # DIESES DOKUMENT
+│
+├── design/                         # UI/UX DESIGN SYSTEM & DESIGN TOKENS
+│   └── tokens.json                 # Plattformunabhängige Design Tokens (W3C Format: Farben, Typo, Spacing, BetrKV)
 │
 ├── proto/                          # CONTRACTS (Single Source of Truth)
 │   └── faciqor/
@@ -47,7 +50,9 @@ faciqor/
 │   ├── mix.exs                     # Elixir Abhängigkeiten
 │   ├── mix.lock
 │   ├── config/                     # Umgebungskonfigurationen (config.exs, prod.exs, runtime.exs)
-│   ├── assets/                     # LiveView Frontend Assets (Tailwind CSS, minimales JS)
+│   ├── assets/                     # LiveView Frontend Assets
+│   │   └── css/
+│   │       └── app.css             # Tailwind v4 / Faciqor Theme Token Integration & ERP Typografie
 │   ├── lib/
 │   │   ├── faciqor/                # DOMÄNENKERN (Ash Domains, Ecto, Business Rules)
 │   │   │   ├── accounts/           # Benutzer, Rollen, Mandanten (RLS)
@@ -106,8 +111,10 @@ faciqor/
 | Modul / Ordner | Produktname | Primäre Technologie | Rolle im Gesamtsystem |
 | :--- | :--- | :--- | :--- |
 | `proto/` | - | Protocol Buffers (v3) | Verbindlicher Schnittstellenvertrag für alle APIs. |
+| `design/` | - | W3C Design Tokens JSON | Zentrale Single Source of Truth für UI/UX-Tokens (Farben, Typografie, Spacings, BetrKV-Farbsemantik) für Web & Mobile. |
 | `backend/lib/faciqor` | - | Elixir (Ash / Ecto) | Transaktionssicherer Domänenkern, GoBD-Journal, RLS-Mandantentrennung. |
 | `backend/lib/faciqor_web`| **Faciqor Hub** | Phoenix LiveView | Web-Dashboard für Sachbearbeiter, Verwalter & Eigentümer (In-Process). |
+| `backend/assets/css/` | - | Tailwind CSS / CSS Custom Properties | ERP-Styling des Faciqor Hubs basierend auf Design Tokens (`--fq-*`). |
 | `backend/lib/faciqor_grpc`| - | Elixir `grpc` | Headless Server-Adapter für externe RPC-Clients. |
 | `cli/` | - | Go (Cobra, Viper, gRPC) | Autarke Standalone-CLI für Administration, Scripting und CI/CD. |
 | `mobile/` | **Faciqor Go & Proof** | Flutter (Dart, Drift) | Offline-First Feld-App für Dienstleister (Keller/Tiefgaragen, GPS, Fotos). |
@@ -148,7 +155,28 @@ Für Einsätze in Kellerräumen und Tiefgaragen gilt das **Outbox-Pattern**:
 
 ---
 
-## 6. Zentrale Befehle (Makefile)
+## 6. UI/UX Design System & Styling-Vorgaben
+
+Die Gestaltung aller Client-Frontends (**Faciqor Hub** in Phoenix LiveView sowie **Faciqor Go & Proof** in Flutter) folgt verbindlich dem plattformunabhängigen Token-System:
+
+### 6.1 Design Tokens als UI Single Source of Truth (`design/tokens.json`)
+* Sämtliche Farbwerte, Typografie-Definitionen, Abstände (`spacing`), Radien und Klickflächenhöhen (`controlHeight`) sind in [tokens.json](file:///S:/src/faciqor/design/tokens.json) nach der W3C Design Tokens Community Group Spezifikation standardisiert.
+* Änderungen am Farbschema oder den visuellen Tokens müssen primär in `design/tokens.json` erfolgen und anschließend in die Client-Stylesheets bzw. Theme-Definitionen übertragen werden.
+
+### 6.2 Faciqor Hub Web Styling (`backend/assets/css/app.css`)
+* **Token-Mapping & Tailwind CSS:** Die Tokens werden im CSS Root-Scope als CSS Custom Properties (`--fq-*`) definiert.
+* **Exklusive BetrKV-Farbsemantik:** Zur Vermeidung von Fehlbuchungen und Fehleinschätzungen sind BetrKV-Statusfarben strikt reserviert:
+  * Umlagefähige Betriebskosten: `--fq-betrkv-allocatable-*` (Grüntöne)
+  * Nicht umlagefähige Instandhaltung: `--fq-betrkv-maintenance-*` (Orangetöne)
+  * Verwaltungskosten: `--fq-betrkv-admin-*` (Indigotöne)
+* **Desktop-First ERP Ergonomie:** Standard-Schriftgröße 14px (`0.875rem`) auf `Inter` für hohe Informationsdichte in Tabellen und Masken.
+* **Numerische Präzision:** Geldbeträge, Zeitstempel, Zählerstände und kryptografische Hashes (`.fq-numeric`, `.fq-mono`, `table td[data-type="currency"]`, etc.) verwenden verpflichtend `JetBrains Mono` mit `font-variant-numeric: tabular-nums` für vertikale Lesbarkeit.
+* **GoBD-konforme Darstellung:** Festgeschriebene Felder (`input[readonly]`, `textarea[readonly]`) werden visuell eindeutig mit gedämpfter Hintergrundfarbe (`--fq-color-bg-muted`) und Default-Cursor als unveränderlich signalisiert.
+* **Touch- & Desktop-Targets:** Berücksichtigung der Klickhöhen (`desktopSm`: 28px, `desktopMd`: 36px für LiveView-Web, `touchMd`: 44px, `touchLg`: 56px für Flutter/Touch-Erfassung).
+
+---
+
+## 7. Zentrale Befehle (Makefile)
 
 Entwickler und automatisierte Agenten nutzen primär die vordefinierten Make-Targets:
 
@@ -174,7 +202,7 @@ make test-all
 
 ---
 
-## 7. Regeln für KI-Entwicklungsagenten & Entwickler
+## 8. Regeln für KI-Entwicklungsagenten & Entwickler
 
 1. **Keine Kreuz-Imports:** Code aus `cli/` darf niemals versuchen, Code aus `backend/` zu importieren (und umgekehrt). Die einzige Brücke ist `proto/`.
 2. **Schema-Migrationen zentralisieren:** Datenbank-Migrationen existieren **ausschließlich** in `backend/priv/repo/migrations/`.

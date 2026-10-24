@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package faciqor.v1;
+option go_package = "faciqor/pkg/api/v1;v1";
+
+enum OrganizationFocus {
+  ORGANIZATION_FOCUS_UNSPECIFIED = 0;
+  ORGANIZATION_FOCUS_PROPERTY_OWNER = 1;
+  ORGANIZATION_FOCUS_PROPERTY_MANAGER = 2;
+  ORGANIZATION_FOCUS_SERVICE_PROVIDER = 3;
+}
+
+enum MembershipRole {
+  MEMBERSHIP_ROLE_UNSPECIFIED = 0;
+  MEMBERSHIP_ROLE_OWNER = 1;
+  MEMBERSHIP_ROLE_MEMBER = 2;
+  MEMBERSHIP_ROLE_GUEST = 3;
+}
+
+service IdentityService {
+  // User Profile
+  rpc GetMyProfile (GetMyProfileRequest) returns (UserProfileResponse);
+  rpc UpdateMyProfile (UpdateMyProfileRequest) returns (UserProfileResponse);
+  rpc RequestAccountDeletion (RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
+
+  // Organizations
+  rpc CreateOrganization (CreateOrganizationRequest) returns (OrganizationResponse);
+  rpc ListMyOrganizations (ListMyOrganizationsRequest) returns (ListMyOrganizationsResponse);
+  rpc GetOrganization (GetOrganizationRequest) returns (OrganizationResponse);
+  rpc UpdateOrganization (UpdateOrganizationRequest) returns (OrganizationResponse);
+  rpc SoftDeleteOrganization (SoftDeleteOrganizationRequest) returns (OrganizationResponse);
+}
+
+message GetMyProfileRequest {}
+
+message UpdateMyProfileRequest {
+  string handle = 1;
+}
+
+message UserProfileResponse {
+  string id = 1;
+  string email = 2;
+  string handle = 3;
+  bool email_verified = 4;
+  string inserted_at = 5;
+}
+
+message RequestAccountDeletionRequest {}
+
+message RequestAccountDeletionResponse {
+  string purge_scheduled_at = 1;
+  repeated string orphaned_organization_handles = 2;
+}
+
+message CreateOrganizationRequest {
+  string handle = 1;
+  OrganizationFocus primary_focus = 2;
+  optional string display_name = 3;
+  optional string legal_name = 4;
+  optional string legal_form = 5;
+  optional string street_address = 6;
+  optional string postal_code = 7;
+  optional string city = 8;
+  optional string country_code = 9;
+  optional string tax_id = 10;
+  optional string vat_id = 11;
+  optional string contact_email = 12;
+}
+
+message UpdateOrganizationRequest {
+  string id_or_handle = 1;
+  optional string handle = 2;
+  optional OrganizationFocus primary_focus = 3;
+  optional string display_name = 4;
+  optional string legal_name = 5;
+  optional string legal_form = 6;
+  optional string street_address = 7;
+  optional string postal_code = 8;
+  optional string city = 9;
+  optional string country_code = 10;
+  optional string tax_id = 11;
+  optional string vat_id = 12;
+  optional string contact_email = 13;
+}
+
+message GetOrganizationRequest {
+  string id_or_handle = 1;
+}
+
+message SoftDeleteOrganizationRequest {
+  string id_or_handle = 1;
+}
+
+message OrganizationResponse {
+  string id = 1;
+  string handle = 2;
+  OrganizationFocus primary_focus = 3;
+  MembershipRole my_role = 4;
+  string display_name = 5;
+  string legal_name = 6;
+  string legal_form = 7;
+  string street_address = 8;
+  string postal_code = 9;
+  string city = 10;
+  string country_code = 11;
+  string tax_id = 12;
+  string vat_id = 13;
+  string contact_email = 14;
+  optional string deleted_at = 15;
+}
+
+message ListMyOrganizationsRequest {}
+
+message ListMyOrganizationsResponse {
+  repeated OrganizationResponse organizations = 1;
+}

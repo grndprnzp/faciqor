@@ -1,0 +1,75 @@
+/* backend/assets/css/app.css */
+@import "tailwindcss";
+
+:root {
+  /* 1. Brand & Surfaces */
+  --fq-color-primary: #1E40AF;
+  --fq-color-primary-hover: #1D4ED8;
+  --fq-color-primary-subtle: #EFF6FF;
+  --fq-color-secondary: #0F766E;
+  --fq-color-focus-ring: #2563EB;
+
+  --fq-color-bg-app: #F8FAFC;
+  --fq-color-bg-surface: #FFFFFF;
+  --fq-color-bg-muted: #F1F5F9;
+
+  --fq-color-border: #E2E8F0;
+  --fq-color-border-strong: #CBD5E1;
+
+  --fq-color-text-main: #0F172A;
+  --fq-color-text-muted: #475569;
+  --fq-color-text-disabled: #94A3B8;
+
+  /* 2. BetrKV Rechtskategorien (Exklusiv reserviert) */
+  --fq-betrkv-allocatable-text: #065F46;
+  --fq-betrkv-allocatable-bg: #D1FAE5;
+  --fq-betrkv-allocatable-border: #6EE7B7;
+
+  --fq-betrkv-maintenance-text: #9A3412;
+  --fq-betrkv-maintenance-bg: #FFEDD5;
+  --fq-betrkv-maintenance-border: #FDBA74;
+
+  --fq-betrkv-admin-text: #3730A3;
+  --fq-betrkv-admin-bg: #E0E7FF;
+  --fq-betrkv-admin-border: #A5B4FC;
+
+  /* 3. System- & SLA-Status */
+  --fq-status-success: #10B981;
+  --fq-status-warning: #F59E0B;
+  --fq-status-danger: #EF4444;
+  --fq-status-info: #3B82F6;
+
+  /* 4. Typografie & Geometrie */
+  --fq-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --fq-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --fq-radius-md: 0.375rem; /* 6px */
+  --fq-radius-lg: 0.5rem;   /* 8px */
+}
+
+/* Globale Basis-Regeln (Desktop-First ERP) */
+body {
+  background-color: var(--fq-color-bg-app);
+  color: var(--fq-color-text-main);
+  font-family: var(--fq-font-sans);
+  font-size: 0.875rem; /* 14px Desktop-Standard */
+  line-height: 1.25rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numerische Präzision für Finanzdaten, Zeiten & Hashes */
+.fq-numeric,
+.fq-mono,
+table td[data-type="currency"],
+table td[data-type="duration"] {
+  font-family: var(--fq-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* GoBD-konforme Darstellung für festgeschriebene (Read-Only) Felder */
+input[readonly],
+textarea[readonly] {
+  background-color: var(--fq-color-bg-muted);
+  color: var(--fq-color-text-main);
+  border-color: var(--fq-color-border);
+  cursor: default;
+}
