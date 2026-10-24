@@ -27,3 +27,6 @@ temp/
 # Docker
 .env
 docker/data/
+
+# Bin Atifacts
+bin/faciqor
