@@ -33,7 +33,7 @@ defmodule Faciqor.Accounts.Changes.GenerateDefaultHandle do
   end
 
   defp ensure_unique_handle(candidate, resource) do
-    case resource |> Ash.Query.filter(handle == ^candidate) |> Ash.read_one() do
+    case resource |> Ash.Query.filter(handle == ^candidate) |> Ash.read_one(authorize?: false) do
       {:ok, nil} -> candidate
       _ -> "#{candidate}-#{random_suffix()}"
     end

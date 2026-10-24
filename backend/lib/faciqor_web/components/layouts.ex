@@ -17,6 +17,8 @@ defmodule FaciqorWeb.Layouts do
         <meta name="csrf-token" content={get_csrf_token()} />
         <title>Faciqor Hub</title>
         <link rel="stylesheet" href={~p"/assets/css/app.css"} />
+        <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+        </script>
       </head>
       <body class="h-full bg-[var(--fq-color-bg-app)] text-[var(--fq-color-text-main)] text-sm">
         <%= @inner_content %>

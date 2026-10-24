@@ -27,10 +27,12 @@ defmodule Faciqor.MixProject do
     [
       # Phoenix & LiveView
       {:phoenix, "~> 1.7.14"},
+      {:phoenix_ecto, "~> 4.6"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.0.0"},
+      {:phoenix_live_view, "~> 1.0"},
       {:floki, ">= 0.30.0", only: :test},
+      {:lazy_html, ">= 0.1.0", only: :test},
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:heroicons,
        github: "tailwindlabs/heroicons",
@@ -45,6 +47,10 @@ defmodule Faciqor.MixProject do
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
 
+      # Assets & Styling
+      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
+      {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
+
       # Ash Ecosystem
       {:ash, "~> 3.4"},
       {:ash_postgres, "~> 2.4"},
@@ -53,6 +59,7 @@ defmodule Faciqor.MixProject do
       {:ash_authentication_phoenix, "~> 2.1"},
       {:ash_oban, "~> 0.2"},
       {:oban, "~> 2.18"},
+      {:picosat_elixir, "~> 0.2"},
 
       # gRPC & Protobuf
       {:grpc, "~> 0.8"},
@@ -65,6 +72,13 @@ defmodule Faciqor.MixProject do
       setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
+      "assets.setup": [
+        "tailwind.install --if-missing",
+        "esbuild.install --if-missing",
+        "cmd sh -c 'if [ \"$(uname)\" = \"Darwin\" ]; then codesign --force -s - _build/tailwind* _build/esbuild* 2>/dev/null || true; fi'"
+      ],
+      "assets.build": ["tailwind default", "esbuild default"],
+      "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
     ]
   end

@@ -62,9 +62,7 @@ defmodule FaciqorGrpc.Services.IdentityService do
       contact_email: req.contact_email
     }
 
-    Accounts.Organization
-    |> Ash.Changeset.for_create(:create_organization, attrs)
-    |> Ash.create(actor: actor)
+    Accounts.create_organization(attrs, actor: actor)
     |> case do
       {:ok, org} ->
         org = Ash.load!(org, :memberships, actor: actor)

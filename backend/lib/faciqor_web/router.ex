@@ -1,5 +1,6 @@
 defmodule FaciqorWeb.Router do
   use FaciqorWeb, :router
+  use AshAuthentication.Phoenix.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -8,10 +9,14 @@ defmodule FaciqorWeb.Router do
     plug :put_root_layout, html: {FaciqorWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :load_from_session
   end
 
   scope "/", FaciqorWeb do
     pipe_through :browser
+
+    auth_routes AuthController, Faciqor.Accounts.User
+    sign_out_route AuthController
 
     live_session :public,
       on_mount: [{FaciqorWeb.LiveUserAuth, :live_user_optional}] do

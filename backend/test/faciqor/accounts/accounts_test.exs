@@ -271,4 +271,128 @@ defmodule Faciqor.AccountsTest do
                User |> Ash.Query.filter(id == ^user1.id) |> Ash.read_one(authorize?: false)
     end
   end
+
+  describe "Organization Creation & Owner Membership Policies" do
+    test "creating an organization via Accounts.create_organization automatically establishes owner membership" do
+      {:ok, user} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "owner-direct@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      {:ok, org} =
+        Accounts.create_organization(
+          %{
+            handle: "direct-org",
+            primary_focus: :property_manager,
+            legal_name: "Direct Management GmbH"
+          },
+          actor: user
+        )
+
+      assert to_string(org.handle) == "direct-org"
+
+      # Check membership was created
+      {:ok, fetched_org} = Accounts.get_organization_by_id_or_handle("direct-org", actor: user)
+      assert fetched_org.id == org.id
+      assert length(fetched_org.memberships) == 1
+
+      membership = List.first(fetched_org.memberships)
+      assert membership.user_id == user.id
+      assert membership.role == :owner
+    end
+
+    test "creating an organization via Ash.Changeset.for_create without actor in changeset still creates owner membership" do
+      {:ok, user} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "cs-no-actor@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      {:ok, org} =
+        Organization
+        |> Ash.Changeset.for_create(:create_organization, %{
+          handle: "cs-org",
+          primary_focus: :property_owner
+        })
+        |> Ash.create(actor: user)
+
+      # Verified through get_organization_by_id_or_handle (which enforces read policy memberships.user_id == actor.id)
+      {:ok, fetched_org} = Accounts.get_organization_by_id_or_handle(to_string(org.handle), actor: user)
+      assert fetched_org.id == org.id
+
+      membership = Enum.find(fetched_org.memberships, &(&1.user_id == user.id))
+      assert membership != nil
+      assert membership.role == :owner
+    end
+
+    test "get_organization_by_id_or_handle distinguishes 16-character handles from UUIDs" do
+      {:ok, user} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "sixteen-char@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      # 16-character ASCII handle (e.g. "meine-verwaltung") which byte_size == 16
+      handle_16 = "meine-verwaltung"
+      assert byte_size(handle_16) == 16
+
+      {:ok, org} =
+        Accounts.create_organization(
+          %{
+            handle: handle_16,
+            primary_focus: :service_provider
+          },
+          actor: user
+        )
+
+      # Lookup by handle
+      {:ok, by_handle} = Accounts.get_organization_by_id_or_handle(handle_16, actor: user)
+      assert by_handle.id == org.id
+
+      # Lookup by UUID
+      {:ok, by_uuid} = Accounts.get_organization_by_id_or_handle(org.id, actor: user)
+      assert by_uuid.id == org.id
+    end
+
+    test "non-member user cannot read or access organization" do
+      {:ok, owner} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "org-owner@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      {:ok, stranger} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "stranger@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      {:ok, _org} =
+        Accounts.create_organization(
+          %{
+            handle: "private-org",
+            primary_focus: :property_owner
+          },
+          actor: owner
+        )
+
+      # Owner can read
+      assert {:ok, _} = Accounts.get_organization_by_id_or_handle("private-org", actor: owner)
+
+      # Stranger cannot read (policy rejects, returning not found)
+      assert {:error, %Ash.Error.Query.NotFound{}} =
+               Accounts.get_organization_by_id_or_handle("private-org", actor: stranger)
+    end
+  end
 end

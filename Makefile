@@ -5,7 +5,7 @@ proto:
 	buf generate
 
 build-cli:
-	cd cli && go build -o ../bin/faciqor ./cmd/faciqor
+	cd cli && go build -ldflags="-linkmode=external" -o ../bin/faciqor ./cmd/faciqor
 
 build-cli-freebsd:
 	cd cli && GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ../bin/faciqor-freebsd-amd64 ./cmd/faciqor
@@ -18,4 +18,4 @@ codegen-mobile:
 
 test-all:
 	cd backend && mix test
-	cd cli && go test ./...
+	cd cli && CGO_ENABLED=0 go test ./...

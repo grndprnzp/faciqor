@@ -90,4 +90,89 @@ defmodule FaciqorWeb.LiveViewsTest do
       refute member_html =~ "org-danger-zone"
     end
   end
+
+  describe "7.2.4 Organization Creation & Settings Access" do
+    test "creating an organization via /orgs/new registers user as owner and allows access to settings",
+         %{conn: conn} do
+      {:ok, user} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "founder@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      conn = init_test_session(conn, %{"user_id" => user.id})
+
+      {:ok, view, html} = live(conn, ~p"/orgs/new")
+      assert html =~ "Neue Organisation gründen"
+
+      # Select focus
+      render_click(view, :select_focus, %{"focus" => "property_manager"})
+
+      # Toggle optional company details
+      render_click(view, :toggle_optional, %{})
+
+      # Submit form with @ prefix in handle
+      {:error, {:live_redirect, %{to: target_path}}} =
+        view
+        |> form("form", %{
+          "handle" => "@hv2-test",
+          "display_name" => "Muster HV",
+          "legal_name" => "Muster Hausverwaltung GmbH"
+        })
+        |> render_submit()
+
+      assert target_path == "/orgs/hv2-test/settings"
+
+      # Navigate to settings page
+      {:ok, _settings_view, settings_html} = live(conn, target_path)
+
+      # Should be owner and editable
+      assert settings_html =~ "@hv2-test"
+      assert settings_html =~ "Änderungen speichern"
+      assert settings_html =~ "org-danger-zone"
+      refute settings_html =~ "Organisation nicht gefunden oder kein Zugriff."
+
+      # On /dashboard, the newly created org is listed and empty state is replaced
+      {:ok, _dash_view, dash_html} = live(conn, ~p"/dashboard")
+      assert dash_html =~ "@hv2-test"
+      assert dash_html =~ "Ihre Organisationen"
+      refute dash_html =~ "onboarding-empty-state"
+    end
+
+    test "unauthorized user visiting /orgs/:handle/settings is redirected with error flash",
+         %{conn: conn} do
+      {:ok, owner} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "real-owner@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      {:ok, stranger} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "stranger-live@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      {:ok, org} =
+        Faciqor.Accounts.create_organization(
+          %{
+            handle: "top-secret-org",
+            primary_focus: :property_owner
+          },
+          actor: owner
+        )
+
+      stranger_conn = init_test_session(conn, %{"user_id" => stranger.id})
+
+      # Mounting /orgs/top-secret-org/settings as stranger redirects to dashboard
+      assert {:error, {:live_redirect, %{to: "/dashboard", flash: %{"error" => "Organisation nicht gefunden oder kein Zugriff."}}}} =
+               live(stranger_conn, ~p"/orgs/#{org.handle}/settings")
+    end
+  end
 end

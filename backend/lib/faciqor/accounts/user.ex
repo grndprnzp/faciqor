@@ -15,6 +15,7 @@ defmodule Faciqor.Accounts.User do
     tokens do
       enabled? true
       token_resource Faciqor.Accounts.Token
+      require_token_presence_for_authentication? true
       signing_secret fn _, _ ->
         case Application.fetch_env(:faciqor, :token_signing_secret) do
           {:ok, secret} -> {:ok, secret}
@@ -28,13 +29,33 @@ defmodule Faciqor.Accounts.User do
         identity_field :email
         hashed_password_field :hashed_password
         sign_in_tokens_enabled? true
+        confirmation_required? false
       end
 
       magic_link do
         identity_field :email
-        sender fn user, token, _opts ->
+        registration_enabled? true
+
+        sender fn user_or_email, token, _opts ->
+          email =
+            cond do
+              is_binary(user_or_email) -> user_or_email
+              is_struct(user_or_email) and Map.has_key?(user_or_email, :email) -> to_string(user_or_email.email)
+              true -> to_string(user_or_email)
+            end
+
+          url = "http://localhost:4000/auth/user/magic_link?token=#{token}"
+
           require Logger
-          Logger.info("[MagicLink] Token for #{user.email}: #{token}")
+          Logger.info("""
+
+          ========================================================================
+          [DEV MAGIC LINK] für #{email}:
+          #{url}
+          ========================================================================
+          """)
+
+          Phoenix.PubSub.broadcast(Faciqor.PubSub, "dev:magic_link:#{email}", {:magic_link_generated, email, url})
         end
       end
 
@@ -127,17 +148,38 @@ defmodule Faciqor.Accounts.User do
       change set_attribute(:handle, arg(:handle))
       change Faciqor.Accounts.Changes.GenerateDefaultHandle
       change AshAuthentication.Strategy.Password.HashPasswordChange
+      change AshAuthentication.GenerateTokenChange
     end
 
     create :sign_in_with_magic_link do
-      argument :email, :ci_string, allow_nil?: false
+      argument :token, :string, allow_nil?: true
+      argument :email, :ci_string, allow_nil?: true
       upsert? true
       upsert_identity :unique_email
       upsert_fields [:email_confirmed_at]
 
-      change set_attribute(:email, arg(:email))
+      change fn changeset, context ->
+        token = Ash.Changeset.get_argument(changeset, :token)
+        email = Ash.Changeset.get_argument(changeset, :email)
+
+        cond do
+          not is_nil(token) and token != "" ->
+            AshAuthentication.Strategy.MagicLink.SignInChange.change(changeset, [], context)
+
+          not is_nil(email) and email != "" ->
+            Ash.Changeset.change_attribute(changeset, :email, email)
+
+          true ->
+            Ash.Changeset.add_error(
+              changeset,
+              Ash.Error.Changes.Required.exception(resource: changeset.resource, field: :email)
+            )
+        end
+      end
+
       change set_attribute(:email_confirmed_at, &DateTime.utc_now/0)
       change Faciqor.Accounts.Changes.GenerateDefaultHandle
+      change AshAuthentication.GenerateTokenChange
     end
 
     create :register_with_google do

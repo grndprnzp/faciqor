@@ -23,3 +23,7 @@ temp/
 
 # Protocol Buffers / Buf cache
 .buf/
+
+# Docker
+.env
+docker/data/

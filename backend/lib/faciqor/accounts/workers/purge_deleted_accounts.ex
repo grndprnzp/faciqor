@@ -9,17 +9,17 @@ defmodule Faciqor.Accounts.Workers.PurgeDeletedAccounts do
     # 1. Purge organizations soft-deleted more than 60 days ago
     Faciqor.Accounts.Organization
     |> Ash.Query.filter(not is_nil(deleted_at) and deleted_at < ^sixty_days_ago)
-    |> Ash.read!()
+    |> Ash.read!(authorize?: false)
     |> Enum.each(fn org ->
-      Ash.destroy!(org)
+      Ash.destroy!(org, authorize?: false)
     end)
 
     # 2. Purge users soft-deleted more than 60 days ago
     Faciqor.Accounts.User
     |> Ash.Query.filter(not is_nil(deleted_at) and deleted_at < ^sixty_days_ago)
-    |> Ash.read!()
+    |> Ash.read!(authorize?: false)
     |> Enum.each(fn user ->
-      Ash.destroy!(user)
+      Ash.destroy!(user, authorize?: false)
     end)
 
     :ok

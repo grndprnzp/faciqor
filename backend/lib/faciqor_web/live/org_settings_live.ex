@@ -7,7 +7,9 @@ defmodule FaciqorWeb.OrgSettingsLive do
   def mount(%{"handle" => handle}, _session, socket) do
     user = socket.assigns.current_user
 
-    case Accounts.get_organization_by_id_or_handle(handle, actor: user) do
+    clean_handle = handle |> to_string() |> String.trim_leading("@")
+
+    case Accounts.get_organization_by_id_or_handle(clean_handle, actor: user) do
       {:ok, org} ->
         role = find_user_role(org, user.id)
         is_owner? = role == :owner
@@ -15,6 +17,7 @@ defmodule FaciqorWeb.OrgSettingsLive do
         {:ok,
          socket
          |> assign(:org, org)
+         |> assign(:current_org, org)
          |> assign(:my_role, role)
          |> assign(:is_owner?, is_owner?)}
 

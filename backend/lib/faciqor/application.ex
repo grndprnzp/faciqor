@@ -9,7 +9,10 @@ defmodule Faciqor.Application do
       {Phoenix.PubSub, name: Faciqor.PubSub},
       {Oban, Application.fetch_env!(:faciqor, Oban)},
       FaciqorWeb.Endpoint,
-      {GRPC.Server.Supervisor, endpoint: FaciqorGrpc.Endpoint, port: 50051}
+      {GRPC.Server.Supervisor,
+       endpoint: FaciqorGrpc.Endpoint,
+       port: 50051,
+       start_server: Application.get_env(:grpc, :start_server, Mix.env() != :test)}
     ]
 
     opts = [strategy: :one_for_one, name: Faciqor.Supervisor]

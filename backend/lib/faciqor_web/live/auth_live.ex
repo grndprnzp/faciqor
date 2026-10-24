@@ -8,7 +8,36 @@ defmodule FaciqorWeb.AuthLive do
      |> assign(:active_tab, :magic_link)
      |> assign(:email, "")
      |> assign(:password, "")
-     |> assign(:magic_link_sent, false)}
+     |> assign(:magic_link_sent, false)
+     |> assign(:dev_magic_link, nil)}
+  end
+
+  @impl true
+  def handle_params(%{"email" => email}, _uri, socket) when email != "" do
+    email = String.trim(email)
+    Phoenix.PubSub.subscribe(Faciqor.PubSub, "dev:magic_link:#{email}")
+
+    case Faciqor.Accounts.User
+         |> Ash.Query.for_read(:request_magic_link, %{email: email})
+         |> Ash.read(authorize?: false) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:email, email)
+         |> assign(:magic_link_sent, true)
+         |> put_flash(:info, "Einmal-Anmeldelink wurde an #{email} gesendet.")}
+
+      {:error, _error} ->
+        {:noreply,
+         socket
+         |> assign(:email, email)
+         |> put_flash(:error, "Fehler beim Anfordern des Anmeldelinks. Bitte Eingabe prüfen.")}
+    end
+  end
+
+  @impl true
+  def handle_params(_params, _uri, socket) do
+    {:noreply, socket}
   end
 
   @impl true
@@ -21,11 +50,32 @@ defmodule FaciqorWeb.AuthLive do
   end
 
   def handle_event("send_magic_link", %{"email" => email}, socket) do
-    {:noreply,
-     socket
-     |> assign(:email, email)
-     |> assign(:magic_link_sent, true)
-     |> put_flash(:info, "Einmal-Anmeldelink wurde an #{email} gesendet.")}
+    email = String.trim(email)
+
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Faciqor.PubSub, "dev:magic_link:#{email}")
+    end
+
+    case Faciqor.Accounts.User
+         |> Ash.Query.for_read(:request_magic_link, %{email: email})
+         |> Ash.read(authorize?: false) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(:email, email)
+         |> assign(:magic_link_sent, true)
+         |> put_flash(:info, "Einmal-Anmeldelink wurde an #{email} gesendet.")}
+
+      {:error, _error} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Fehler beim Anfordern des Anmeldelinks. Bitte Eingabe prüfen.")}
+    end
+  end
+
+  @impl true
+  def handle_info({:magic_link_generated, _email, url}, socket) do
+    {:noreply, assign(socket, :dev_magic_link, url)}
   end
 
   @impl true
@@ -107,11 +157,27 @@ defmodule FaciqorWeb.AuthLive do
               Einmal-Anmeldelink senden
             </.button>
           </form>
+
+          <div :if={@dev_magic_link} id="dev-magic-link-banner" class="p-3 rounded-md bg-[#EFF6FF] border border-[#BFDBFE] space-y-2">
+            <div class="flex items-center gap-1.5 text-xs font-semibold text-[#1E40AF]">
+              <span>🚀 [Entwicklungsmodus] Anmeldelink generiert</span>
+            </div>
+            <p class="text-xs text-[#1E3A8A]">
+              Direkt im Browser anmelden ohne E-Mail-Postfach (auch im Terminal geloggt):
+            </p>
+            <a
+              href={@dev_magic_link}
+              class="flex items-center justify-center w-full h-11 lg:h-9 rounded-md bg-[var(--fq-color-primary)] text-white text-xs font-medium hover:bg-[var(--fq-color-primary-hover)] transition-colors shadow-sm"
+            >
+              Jetzt direkt als <%= @email %> anmelden &rarr;
+            </a>
+          </div>
         <% else %>
-          <form method="post" action="/auth/user/password" class="space-y-4">
+          <form method="post" action={if @live_action == :register, do: "/auth/user/password/register", else: "/auth/user/password/sign_in"} class="space-y-4">
+            <input type="hidden" name="_csrf_token" value={Phoenix.Controller.get_csrf_token()} />
             <.input
               id="password-email"
-              name="email"
+              name="user[email]"
               type="email"
               label="E-Mail-Adresse"
               value={@email}
@@ -120,7 +186,7 @@ defmodule FaciqorWeb.AuthLive do
             />
             <.input
               id="password-input"
-              name="password"
+              name="user[password]"
               type="password"
               label="Passwort (min. 12 Zeichen)"
               value={@password}

@@ -43,8 +43,14 @@ defmodule FaciqorWeb.OrgNewLive do
   def handle_event("create_org", params, socket) do
     user = socket.assigns.current_user
 
+    raw_handle =
+      params["handle"]
+      |> to_string()
+      |> String.trim()
+      |> String.trim_leading("@")
+
     attrs = %{
-      handle: params["handle"],
+      handle: raw_handle,
       primary_focus: socket.assigns.primary_focus,
       display_name: blank_to_nil(params["display_name"]),
       legal_name: blank_to_nil(params["legal_name"]),
@@ -58,9 +64,7 @@ defmodule FaciqorWeb.OrgNewLive do
       contact_email: blank_to_nil(params["contact_email"])
     }
 
-    case Accounts.Organization
-         |> Ash.Changeset.for_create(:create_organization, attrs)
-         |> Ash.create(actor: user) do
+    case Accounts.create_organization(attrs, actor: user) do
       {:ok, org} ->
         {:noreply,
          socket

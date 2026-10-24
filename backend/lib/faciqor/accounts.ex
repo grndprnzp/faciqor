@@ -14,6 +14,17 @@ defmodule Faciqor.Accounts do
   end
 
   @doc """
+  Creates a new organization with the given actor as owner.
+  """
+  def create_organization(attrs, opts \\ []) do
+    actor = Keyword.fetch!(opts, :actor)
+
+    Faciqor.Accounts.Organization
+    |> Ash.Changeset.for_create(:create_organization, attrs, actor: actor)
+    |> Ash.create(actor: actor)
+  end
+
+  @doc """
   Generates a new Personal Access Token (`fq_pat_...`) for the given user (`actor`).
   Returns `{:ok, plain_token, api_token_record}` or `{:error, error}`.
   """
@@ -28,7 +39,7 @@ defmodule Faciqor.Accounts do
       name: name,
       expires_at: expires_at,
       token_plain: plain_token
-    })
+    }, actor: actor)
     |> Ash.create(actor: actor)
     |> case do
       {:ok, record} -> {:ok, plain_token, record}
@@ -70,14 +81,12 @@ defmodule Faciqor.Accounts do
     actor = Keyword.fetch!(opts, :actor)
 
     query =
-      case Ecto.UUID.cast(id_or_handle) do
-        {:ok, uuid} ->
-          Faciqor.Accounts.Organization
-          |> Ash.Query.filter(id == ^uuid and is_nil(deleted_at))
-
-        :error ->
-          Faciqor.Accounts.Organization
-          |> Ash.Query.filter(handle == ^id_or_handle and is_nil(deleted_at))
+      if valid_uuid?(id_or_handle) do
+        Faciqor.Accounts.Organization
+        |> Ash.Query.filter(id == ^id_or_handle and is_nil(deleted_at))
+      else
+        Faciqor.Accounts.Organization
+        |> Ash.Query.filter(handle == ^id_or_handle and is_nil(deleted_at))
       end
 
     case query |> Ash.Query.load(:memberships) |> Ash.read_one(actor: actor) do
@@ -86,4 +95,13 @@ defmodule Faciqor.Accounts do
       {:error, err} -> {:error, err}
     end
   end
+
+  defp valid_uuid?(str) when is_binary(str) do
+    case Ecto.UUID.cast(str) do
+      {:ok, formatted} -> byte_size(str) == 36 and String.downcase(str) == String.downcase(formatted)
+      _ -> false
+    end
+  end
+
+  defp valid_uuid?(_), do: false
 end

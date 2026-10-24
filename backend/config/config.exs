@@ -7,6 +7,9 @@ config :faciqor,
   ecto_repos: [Faciqor.Repo],
   generators: [timestamp_type: :utc_datetime_usec]
 
+config :ash,
+  default_string_length_count: :codepoints
+
 config :faciqor, Faciqor.Repo,
   migration_primary_key: [name: :id, type: :binary_id]
 
@@ -38,5 +41,32 @@ config :logger, :console,
   metadata: [:request_id]
 
 config :phoenix, :json_library, Jason
+
+# Configure tailwind (the version is required)
+config :tailwind,
+  version: "4.3.0",
+  default: [
+    args: ~w(
+      --input=assets/css/app.css
+      --output=priv/static/assets/css/app.css
+    ),
+    cd: Path.expand("..", __DIR__)
+  ]
+
+# Configure esbuild (the version is required)
+config :esbuild,
+  version: "0.25.0",
+  default: [
+    args: ~w(
+      js/app.js
+      --bundle
+      --target=es2020
+      --outdir=../priv/static/assets/js
+      --external:/fonts/*
+      --external:/images/*
+    ),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
+  ]
 
 import_config "#{config_env()}.exs"
