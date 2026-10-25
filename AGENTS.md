@@ -90,6 +90,10 @@ end
 * Verwende `Ash.Policy.Authorizer` für feingranulare Autorisierung.
 * Autorisierungsregeln gehören in die Ressource (`policies do ... end`), nicht verstreut in Phoenix LiveView Mounts oder gRPC-Services.
 
+### 3.4 Explizite Attribut-Akzeptanz in Aktionen
+* Benutzerdefinierte Ash-Aktionen (`create :action_name` / `update :action_name`) akzeptieren standardmäßig keine Attribute.
+* **PFLICHT:** Alle Attribute, die über Action-Parameter persistiert werden müssen (z. B. technische Metadaten wie `:width`, `:height`), müssen zwingend in `accept [...]` deklariert sein. Ash verwirft nicht deklarierte Felder stillschweigend.
+
 ---
 
 ## 4. Elixir & Phoenix LiveView (Faciqor Hub)
@@ -111,6 +115,13 @@ end
   Phoenix.PubSub.broadcast(Faciqor.PubSub, "tenant:#{tenant_id}:operations", {:work_order_completed, order_id})
   ```
 * LiveViews abonnieren diese Topics im `mount/3` und aktualisieren sich ohne Page Reload.
+
+### 4.4 Client-Side JS Hooks & DOM-Isolation (Cropper, Charts, Maps)
+Wenn JavaScript-Bibliotheken (z. B. CropperJS, Leaflet, Chart.js) das DOM dynamisch manipulieren:
+* **PFLICHT:** Der Wrapper-Container muss `phx-update="ignore"` tragen, damit LiveView/Morphdom bei Rerenders die dynamischen Knoten nicht verwirft oder zerstört.
+* **PFLICHT:** Container für dynamische Medien/Canvases müssen eine feste Mindesthöhe (z. B. `h-80`) haben, um Höhen-Kollaps (`0px`) während der Initialisierung zu verhindern.
+* **PFLICHT:** Bildquellen (`previewImg.src = dataUrl`) decodieren asynchron. Die Initialisierung von Canvas/Cropper-Instanzen darf erst im `previewImg.onload`-Callback erfolgen.
+* **PFLICHT:** Modale Aktionsbuttons müssen per Event-Delegation (`document.addEventListener`) angebunden und im `destroyed()`-Hook sauber deregistriert werden, um Event-Verluste bei Morphdom-Patches zu verhindern.
 
 ---
 
@@ -171,3 +182,4 @@ Wenn du als Agent ein Feature oder einen Fix implementierst, folge strikt dieser
 * ❌ **Keine Frontend-Löschbuttons für Finanzdaten:** Benenne destruktive Aktionen niemals „Löschen“, sondern „Stornieren“ bzw. „Abnahme verweigern“.
 * ❌ **Keine riesigen Binärdateien im Git & kein Durchschleifen von Blobs:** Bilder, Mockups und Belege gehören in den S3-kompatiblen Object Storage. Clients laden via Pre-Signed S3-URLs direkt hoch; im Backend und in der DB werden ausschließlich SHA-256-Hashes und Storage-Keys verarbeitet.
 * ❌ **Kein MinIO / keine Copyleft-Storage-Tools:** Verwende niemals MinIO (AGPLv3-Lizenzrisiko). Für lokale Entwicklung und On-Premise/FreeBSD-Installationen wird ausschließlich das permissiv lizenzierte SeaweedFS (Apache 2.0) eingesetzt, in der Cloud standardisierte S3-Dienste (Cloudflare R2, Hetzner, AWS S3).
+* ❌ **Keine uninitialisierten Dev-Buckets:** S3-kompatible Speicher im lokalen Dev-Betrieb (SeaweedFS) starten mit leerem Dateisystem. Das Backend muss bei Applikationsstart (`Storage.ensure_buckets/0`) zwingend idempotent prüfen, ob die Pflicht-Buckets (`faciqor-public`, `faciqor-vault`) existieren, und diese bei Bedarf automatisch anlegen, um `403 AccessDenied`/`404 NoSuchBucket`-Fehler bei Uploads zu verhindern.
