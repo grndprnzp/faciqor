@@ -19,6 +19,27 @@ services:
       timeout: 5s
       retries: 5
 
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: faciqor-storage
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: "server -s3 -dir=/data -s3.port=8333 -ip.bind=0.0.0.0"
+    ports:
+      - "${STORAGE_S3_PORT:-8333}:8333"
+      - "${STORAGE_FILER_PORT:-8888}:8888"
+      - "${STORAGE_MASTER_PORT:-9333}:9333"
+    volumes:
+      - seaweedfs_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8333/"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
     name: faciqor_postgres_data
+  seaweedfs_data:
+    name: faciqor_seaweedfs_data

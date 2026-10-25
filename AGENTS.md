@@ -169,4 +169,5 @@ Wenn du als Agent ein Feature oder einen Fix implementierst, folge strikt dieser
 * ❌ **Keine Raw-Ecto-Bypässe:** Schreibe niemals `Repo.all(from j in "journal_entries")` unter Umgehung der Ash-Domain und RLS-Policy.
 * ❌ **Keine Client-Trust-Tenant-IDs:** Akzeptiere niemals eine vom Client im Request-Body übergebene `tenant_id` ohne vorherige Validierung gegen den JWT-Token-Claim.
 * ❌ **Keine Frontend-Löschbuttons für Finanzdaten:** Benenne destruktive Aktionen niemals „Löschen“, sondern „Stornieren“ bzw. „Abnahme verweigern“.
-* ❌ **Keine riesigen Binärdateien im Git:** Bilder, Mockups und Belege gehören in S3/MinIO. Im Code und in der DB werden nur SHA-256-Hashes und Storage-Keys verarbeitet.
+* ❌ **Keine riesigen Binärdateien im Git & kein Durchschleifen von Blobs:** Bilder, Mockups und Belege gehören in den S3-kompatiblen Object Storage. Clients laden via Pre-Signed S3-URLs direkt hoch; im Backend und in der DB werden ausschließlich SHA-256-Hashes und Storage-Keys verarbeitet.
+* ❌ **Kein MinIO / keine Copyleft-Storage-Tools:** Verwende niemals MinIO (AGPLv3-Lizenzrisiko). Für lokale Entwicklung und On-Premise/FreeBSD-Installationen wird ausschließlich das permissiv lizenzierte SeaweedFS (Apache 2.0) eingesetzt, in der Cloud standardisierte S3-Dienste (Cloudflare R2, Hetzner, AWS S3).

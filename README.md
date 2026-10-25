@@ -14,6 +14,7 @@ Das Monorepo ist nach dem **Contract-First-Prinzip** aufgebaut. Es gibt keine di
 | :--- | :--- | :--- | :--- |
 | [`proto/`](proto/) | **API Contracts** | Protocol Buffers v3 (`buf.build`) | – |
 | [`design/`](design/) | **Design System** | W3C Design Tokens (`tokens.json`) | – |
+| [`docker/`](docker/) | **Infrastruktur** | PostgreSQL 16 & SeaweedFS (S3 Object Storage) | `5432` (DB), `8333` (S3), `8888` (Filer UI) |
 | [`backend/`](backend/) | **Faciqor Core, Hub & gRPC** | Elixir 1.16+, Phoenix LiveView, Ash 3.x, Oban, gRPC | `4000` (Web), `50051` (gRPC) |
 | [`cli/`](cli/) | **Standalone CLI (`faciqor`)** | Go 1.22+, Cobra, Viper, gRPC | Verbindet auf `:50051` |
 | [`mobile/`](mobile/) | **Faciqor Go & Proof** | Flutter / Dart, Drift (SQLite Outbox) | Verbindet auf `:50051` |
@@ -28,22 +29,33 @@ Weiterführende Details finden sich in:
 
 ## 2. Voraussetzungen (Plattformübergreifend)
 
-### 2.1 Infrastruktur via Container (Vorausgesetzt)
-Für die lokale Entwicklung wird eine laufende **PostgreSQL 16+**-Instanz benötigt (inklusive den Erweiterungen `uuid-ossp` und `citext`, welche die Migrationen automatisch aktivieren).
+### 2.1 Infrastruktur via Container (PostgreSQL & SeaweedFS S3-Storage)
+Für die lokale Entwicklung wird eine laufende **PostgreSQL 16+**-Instanz (mit `citext` und `uuid-ossp`) sowie **SeaweedFS** als S3-kompatibler Object Storage (für Avatare, Firmenlogos und GoBD-konforme Belege/Nachweise) benötigt.
 
-Starten der Entwicklungsdatenbank per Docker (identisch auf Linux & Windows):
+Beide Dienste können bequem über Docker Compose im Verzeichnis [`docker/`](docker/) gestartet werden (identisch auf Linux & Windows):
 
 ```bash
-docker run -d \
-  --name faciqor-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=faciqor_dev \
-  -p 5432:5432 \
-  postgres:16-alpine
+# 1. Optionale Anpassung der Ports/Zugangsdaten (Standardwerte funktionieren out-of-the-box):
+cp docker/.env.example docker/.env
+
+# 2. Beide Dienste im Hintergrund starten:
+docker compose -f docker/compose.yml up -d
 ```
 
-> **Hinweis für Podman / FreeBSD Jails:** Der Befehl ist 1:1 mit `podman run ...` kompatibel. Solange PostgreSQL auf `localhost:5432` mit Benutzer `postgres` / Passwort `postgres` erreichbar ist, funktioniert die Standardkonfiguration in [`backend/config/dev.exs`](backend/config/dev.exs) und [`backend/config/test.exs`](backend/config/test.exs) ohne Anpassung.
+Nach dem Start stehen folgende Endpunkte zur Verfügung:
+* **PostgreSQL 16:** `localhost:5432` (Datenbank `faciqor_dev`, User `postgres`, Passwort `postgres`)
+* **SeaweedFS S3 API:** `http://localhost:8333` (S3-Endpunkt für Pre-Signed URLs & Blob-Uploads)
+* **SeaweedFS Filer Web-UI:** [http://localhost:8888](http://localhost:8888) (Dateibrowser im Web zum Prüfen hochgeladener Buckets und Blobs)
+
+> **Hinweis für Podman / Standalone / FreeBSD Jails:**  
+> Die Dienste können alternativ als Einzelcontainer gestartet werden:
+> ```bash
+> # PostgreSQL 16:
+> docker run -d --name faciqor-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=faciqor_dev -p 5432:5432 postgres:16-alpine
+>
+> # SeaweedFS (S3-Gateway + Filer Web-UI):
+> docker run -d --name faciqor-storage -p 8333:8333 -p 8888:8888 -v faciqor_seaweedfs_data:/data chrislusf/seaweedfs:latest server -s3 -dir=/data -s3.port=8333 -ip.bind=0.0.0.0
+> ```
 
 ### 2.2 Benötigte Sprach-Toolchains
 Falls nicht komplett im Container entwickelt wird, sollten folgende Werkzeuge installiert sein:
@@ -121,11 +133,12 @@ winget install bufbuild.buf
 ```
 *(Schließe und öffne das PowerShell-Fenster danach neu, damit die `PATH`-Variablen aktiv sind.)*
 
-#### 3. PostgreSQL-Container in PowerShell starten
-Falls der Container aus Abschnitt 2.1 noch nicht läuft:
+#### 3. Lokale Infrastruktur in PowerShell starten
+Falls die Container aus Abschnitt 2.1 noch nicht laufen:
 ```powershell
-docker run -d --name faciqor-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=faciqor_dev -p 5432:5432 postgres:16-alpine
+docker compose -f docker\compose.yml up -d
 ```
+*(Alternativ via `docker run`: siehe Einzelbefehle in Abschnitt 2.1)*
 
 #### 4. Backend & CLI in PowerShell starten (ohne `make`)
 Da `make` unter Windows standardmäßig nicht vorinstalliert ist, kannst du alle Befehle aus dem [`Makefile`](Makefile) direkt als native PowerShell-Kommandos ausführen:
