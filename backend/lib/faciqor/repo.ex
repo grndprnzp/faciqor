@@ -8,6 +8,6 @@ defmodule Faciqor.Repo do
   end
 
   def installed_extensions do
-    ["uuid-ossp", "citext"]
+    ["uuid-ossp", "citext", "postgis"]
   end
 end

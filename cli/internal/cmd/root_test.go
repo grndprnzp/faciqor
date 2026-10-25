@@ -28,6 +28,9 @@ type mockIdentityClient struct {
 	uploadURL  string
 	profile    *v1.UserProfileResponse
 	orgs       map[string]*v1.OrganizationResponse
+	facilities map[string]*v1.FacilityResponse
+	nr         *v1.NumberRangeResponse
+	geoCfg     *v1.GeoProviderConfigResponse
 }
 
 func newMockClient(unverified bool) *mockIdentityClient {
@@ -40,7 +43,26 @@ func newMockClient(unverified bool) *mockIdentityClient {
 			EmailVerified: !unverified,
 			InsertedAt:    "2026-10-23T19:00:00Z",
 		},
-		orgs: make(map[string]*v1.OrganizationResponse),
+		orgs:       make(map[string]*v1.OrganizationResponse),
+		facilities: make(map[string]*v1.FacilityResponse),
+		nr: &v1.NumberRangeResponse{
+			Id:             "nr-uuid-1",
+			OrganizationId: "org-uuid-1",
+			EntityType:     v1.NumberRangeEntityType_NUMBER_RANGE_ENTITY_TYPE_FACILITY,
+			Prefix:         "OBJ-",
+			StartValue:     1000,
+			Step:           1,
+			Suffix:         "",
+			PreviewNextKey: "OBJ-1000",
+		},
+		geoCfg: &v1.GeoProviderConfigResponse{
+			OrganizationId:             "org-uuid-1",
+			OrganizationHandle:         "meine-hv",
+			MapProvider:                v1.MapProvider_MAP_PROVIDER_OPENSTREETMAP,
+			GeocodingProvider:          v1.GeocodingProvider_GEOCODING_PROVIDER_NOMINATIM,
+			HasHereApiKey:              false,
+			UpdatedOrganizationHandles: []string{"meine-hv"},
+		},
 	}
 }
 
@@ -307,14 +329,172 @@ func (m *mockIdentityClient) RemoveOrganizationLogo(ctx context.Context, in *v1.
 	return org, nil
 }
 
+// --- OperationsServiceClient mock implementation ---
+
+func (m *mockIdentityClient) GetGeoProviderConfig(ctx context.Context, in *v1.GetGeoProviderConfigRequest, opts ...grpc.CallOption) (*v1.GeoProviderConfigResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	return m.geoCfg, nil
+}
+
+func (m *mockIdentityClient) UpdateGeoProviderConfig(ctx context.Context, in *v1.UpdateGeoProviderConfigRequest, opts ...grpc.CallOption) (*v1.GeoProviderConfigResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	if in.MapProvider != nil {
+		m.geoCfg.MapProvider = *in.MapProvider
+	}
+	if in.GeocodingProvider != nil {
+		m.geoCfg.GeocodingProvider = *in.GeocodingProvider
+	}
+	if in.HereApiKey != nil && *in.HereApiKey != "" {
+		m.geoCfg.HasHereApiKey = true
+	}
+	return m.geoCfg, nil
+}
+
+func (m *mockIdentityClient) GetNumberRange(ctx context.Context, in *v1.GetNumberRangeRequest, opts ...grpc.CallOption) (*v1.NumberRangeResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	return m.nr, nil
+}
+
+func (m *mockIdentityClient) UpdateNumberRange(ctx context.Context, in *v1.UpdateNumberRangeRequest, opts ...grpc.CallOption) (*v1.NumberRangeResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	if in.Prefix != nil {
+		m.nr.Prefix = *in.Prefix
+	}
+	if in.StartValue != nil {
+		m.nr.StartValue = *in.StartValue
+	}
+	if in.Step != nil {
+		m.nr.Step = *in.Step
+	}
+	if in.Suffix != nil {
+		m.nr.Suffix = *in.Suffix
+	}
+	m.nr.PreviewNextKey = "OG-2000-A"
+	return m.nr, nil
+}
+
+func (m *mockIdentityClient) ListFacilities(ctx context.Context, in *v1.ListFacilitiesRequest, opts ...grpc.CallOption) (*v1.ListFacilitiesResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	list := make([]*v1.FacilityResponse, 0, len(m.facilities))
+	for _, f := range m.facilities {
+		list = append(list, f)
+	}
+	return &v1.ListFacilitiesResponse{Facilities: list}, nil
+}
+
+func (m *mockIdentityClient) GetFacility(ctx context.Context, in *v1.GetFacilityRequest, opts ...grpc.CallOption) (*v1.FacilityResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	f, ok := m.facilities[in.IdOrBusinessKey]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "facility not found")
+	}
+	return f, nil
+}
+
+func (m *mockIdentityClient) CreateFacility(ctx context.Context, in *v1.CreateFacilityRequest, opts ...grpc.CallOption) (*v1.FacilityResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	addrs := make([]*v1.FacilityAddressItem, 0, len(in.Addresses))
+	for i, a := range in.Addresses {
+		addrs = append(addrs, &v1.FacilityAddressItem{
+			Id:          "addr-uuid",
+			Street:      a.Street,
+			HouseNumber: a.HouseNumber,
+			PostalCode:  a.PostalCode,
+			City:        a.City,
+			CountryCode: "DE",
+			Latitude:    "52.5200000",
+			Longitude:   "13.4050000",
+			IsPrimary:   i == 0,
+			SortOrder:   int32(i),
+		})
+	}
+	fac := &v1.FacilityResponse{
+		Id:                   "fac-uuid-1",
+		OrganizationId:       "org-uuid-1",
+		BusinessKey:          "OBJ-1000",
+		Title:                "Hauptstraße 10-13",
+		Addresses:            addrs,
+		GeofenceRadiusMeters: 50,
+		InsertedAt:           "2026-10-25T10:00:00Z",
+		UpdatedAt:            "2026-10-25T10:00:00Z",
+	}
+	m.facilities[fac.BusinessKey] = fac
+	return fac, nil
+}
+
+func (m *mockIdentityClient) UpdateFacility(ctx context.Context, in *v1.UpdateFacilityRequest, opts ...grpc.CallOption) (*v1.FacilityResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	fac, ok := m.facilities[in.IdOrBusinessKey]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "facility not found")
+	}
+	if in.GeofenceRadiusMeters != nil {
+		fac.GeofenceRadiusMeters = *in.GeofenceRadiusMeters
+	}
+	return fac, nil
+}
+
+func (m *mockIdentityClient) ArchiveFacility(ctx context.Context, in *v1.ArchiveFacilityRequest, opts ...grpc.CallOption) (*v1.FacilityResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	fac, ok := m.facilities[in.IdOrBusinessKey]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "facility not found")
+	}
+	now := "2026-10-25T11:00:00Z"
+	fac.ArchivedAt = &now
+	return fac, nil
+}
+
+func (m *mockIdentityClient) UnarchiveFacility(ctx context.Context, in *v1.UnarchiveFacilityRequest, opts ...grpc.CallOption) (*v1.FacilityResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	fac, ok := m.facilities[in.IdOrBusinessKey]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "facility not found")
+	}
+	fac.ArchivedAt = nil
+	return fac, nil
+}
+
+func (m *mockIdentityClient) DeleteFacility(ctx context.Context, in *v1.DeleteFacilityRequest, opts ...grpc.CallOption) (*v1.DeleteFacilityResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	delete(m.facilities, in.IdOrBusinessKey)
+	return &v1.DeleteFacilityResponse{Deleted: true}, nil
+}
+
 func runCLI(t *testing.T, mock *mockIdentityClient, configPath string, args ...string) (string, error) {
 	t.Helper()
 	factory := func(endpoint, token string) (v1.IdentityServiceClient, func() error, error) {
 		return mock, func() error { return nil }, nil
 	}
+	opsFactory := func(endpoint, token string) (v1.OperationsServiceClient, func() error, error) {
+		return mock, func() error { return nil }, nil
+	}
 	opts := &cmd.Options{
-		ConfigPath:    configPath,
-		ClientFactory: client.Factory(factory),
+		ConfigPath:              configPath,
+		ClientFactory:           client.Factory(factory),
+		OperationsClientFactory: client.OperationsFactory(opsFactory),
 	}
 	root := cmd.NewRootCmd(opts)
 	buf := new(bytes.Buffer)
@@ -563,5 +743,71 @@ func TestAvatarAndLogoCommands(t *testing.T) {
 	}
 	if mock.orgs["logo-test-org"].LogoUrl != nil {
 		t.Errorf("expected org logo URL to be nil")
+	}
+}
+
+func TestFacilityNumberRangeAndGeoProviderCommands(t *testing.T) {
+	mock := newMockClient(false)
+	tmpConfig := filepath.Join(t.TempDir(), "config.yaml")
+
+	// 1. Number range show & update
+	out, err := runCLI(t, mock, tmpConfig, "org", "number-range", "show", "meine-hv")
+	if err != nil {
+		t.Fatalf("number-range show failed: %v", err)
+	}
+	if !strings.Contains(out, "OBJ-1000") {
+		t.Errorf("expected OBJ-1000 in output, got: %s", out)
+	}
+
+	out, err = runCLI(t, mock, tmpConfig, "org", "number-range", "update", "meine-hv", "--prefix", "OG-", "--start", "2000", "--step", "5", "--suffix", "-A")
+	if err != nil {
+		t.Fatalf("number-range update failed: %v", err)
+	}
+	if !strings.Contains(out, "OG-2000-A") {
+		t.Errorf("expected OG-2000-A in output, got: %s", out)
+	}
+
+	// 2. Geo provider show & update
+	out, err = runCLI(t, mock, tmpConfig, "org", "geo-provider", "update", "meine-hv", "--map-provider", "here", "--geocoding-provider", "here", "--here-api-key", "secret-123", "--apply-all-owned")
+	if err != nil {
+		t.Fatalf("geo-provider update failed: %v", err)
+	}
+	if !strings.Contains(out, "MAP_PROVIDER_HERE") {
+		t.Errorf("expected MAP_PROVIDER_HERE in output, got: %s", out)
+	}
+
+	// 3. Facility create with address range
+	out, err = runCLI(t, mock, tmpConfig, "facility", "create", "--org", "meine-hv", "--address", "Hauptstraße 10-13, 10115 Berlin", "--radius", "50")
+	if err != nil {
+		t.Fatalf("facility create failed: %v", err)
+	}
+	if !strings.Contains(out, "OBJ-1000") || !strings.Contains(out, "Hauptstraße 10-13") {
+		t.Errorf("expected OBJ-1000 and Hauptstraße 10-13 in output, got: %s", out)
+	}
+
+	// 4. Facility list --json
+	out, err = runCLI(t, mock, tmpConfig, "facility", "list", "--org", "meine-hv", "--json")
+	if err != nil {
+		t.Fatalf("facility list --json failed: %v", err)
+	}
+	if !strings.Contains(out, "Hauptstraße 10-13") {
+		t.Errorf("expected facility in JSON list, got: %s", out)
+	}
+
+	// 5. Facility archive, unarchive & delete
+	_, err = runCLI(t, mock, tmpConfig, "facility", "archive", "OBJ-1000", "--org", "meine-hv")
+	if err != nil {
+		t.Fatalf("facility archive failed: %v", err)
+	}
+	_, err = runCLI(t, mock, tmpConfig, "facility", "unarchive", "OBJ-1000", "--org", "meine-hv")
+	if err != nil {
+		t.Fatalf("facility unarchive failed: %v", err)
+	}
+	out, err = runCLI(t, mock, tmpConfig, "facility", "delete", "OBJ-1000", "--org", "meine-hv", "--yes")
+	if err != nil {
+		t.Fatalf("facility delete failed: %v", err)
+	}
+	if !strings.Contains(out, "Objekt erfolgreich gelöscht") {
+		t.Errorf("expected deletion confirmation, got: %s", out)
 	}
 }

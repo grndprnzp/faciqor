@@ -3,7 +3,8 @@ import Config
 config :faciqor,
   ash_domains: [
     Faciqor.Accounts,
-    Faciqor.Media
+    Faciqor.Media,
+    Faciqor.Operations
   ],
   ecto_repos: [Faciqor.Repo],
   generators: [timestamp_type: :utc_datetime_usec]

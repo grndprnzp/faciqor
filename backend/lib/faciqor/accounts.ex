@@ -167,4 +167,60 @@ defmodule Faciqor.Accounts do
     |> Ash.Changeset.for_update(:remove_logo, %{}, actor: actor)
     |> Ash.update(actor: actor)
   end
+
+  @doc """
+  Aktualisiert die Karten- und Geo-Such-Provider-Einstellungen einer Organisation
+  (oder bei `apply_to_all_owned_orgs: true` transaktional für alle aktiven Organisationen,
+  in denen `actor` die Rolle `:owner` besitzt).
+  Gibt `{:ok, updated_org, updated_handles}` oder `{:error, error}` zurück.
+  """
+  def update_geo_provider_config(org, attrs, opts \\ []) when is_map(attrs) do
+    actor = Keyword.fetch!(opts, :actor)
+    apply_to_all? = Keyword.get(opts, :apply_to_all_owned_orgs, false)
+
+    Faciqor.Repo.transaction(fn ->
+      primary_updated =
+        org
+        |> Ash.Changeset.for_update(:update_geo_settings, attrs, actor: actor)
+        |> Ash.update(actor: actor)
+        |> case do
+          {:ok, u} -> u
+          {:error, err} -> Faciqor.Repo.rollback(err)
+        end
+
+      if apply_to_all? do
+        effective_attrs = %{
+          map_provider: primary_updated.map_provider,
+          geocoding_provider: primary_updated.geocoding_provider,
+          here_api_key: primary_updated.here_api_key
+        }
+
+        owned_orgs =
+          Faciqor.Accounts.Organization
+          |> Ash.Query.filter(
+            is_nil(deleted_at) and memberships.user_id == ^actor.id and memberships.role == :owner
+          )
+          |> Ash.read!(actor: actor)
+
+        handles =
+          Enum.map(owned_orgs, fn target_org ->
+            if target_org.id != primary_updated.id do
+              target_org
+              |> Ash.Changeset.for_update(:update_geo_settings, effective_attrs, actor: actor)
+              |> Ash.update!(actor: actor)
+            end
+
+            to_string(target_org.handle)
+          end)
+
+        {primary_updated, handles}
+      else
+        {primary_updated, [to_string(primary_updated.handle)]}
+      end
+    end)
+    |> case do
+      {:ok, {updated_org, handles}} -> {:ok, updated_org, handles}
+      {:error, err} -> {:error, err}
+    end
+  end
 end

@@ -15,10 +15,11 @@ import (
 )
 
 type Options struct {
-	ConfigPath    string
-	EndpointFlag  string
-	JSONOutput    bool
-	ClientFactory client.Factory
+	ConfigPath              string
+	EndpointFlag            string
+	JSONOutput              bool
+	ClientFactory           client.Factory
+	OperationsClientFactory client.OperationsFactory
 }
 
 func NewRootCmd(opts *Options) *cobra.Command {
@@ -27,6 +28,9 @@ func NewRootCmd(opts *Options) *cobra.Command {
 	}
 	if opts.ClientFactory == nil {
 		opts.ClientFactory = client.DefaultFactory
+	}
+	if opts.OperationsClientFactory == nil {
+		opts.OperationsClientFactory = client.DefaultOperationsFactory
 	}
 
 	rootCmd := &cobra.Command{
@@ -42,6 +46,7 @@ func NewRootCmd(opts *Options) *cobra.Command {
 	rootCmd.AddCommand(newAuthCmd(opts))
 	rootCmd.AddCommand(newProfileCmd(opts))
 	rootCmd.AddCommand(newOrgCmd(opts))
+	rootCmd.AddCommand(newFacilityCmd(opts))
 
 	return rootCmd
 }
@@ -794,7 +799,16 @@ func newOrgCmd(opts *Options) *cobra.Command {
 	}
 	logoCmd.AddCommand(logoSetCmd, logoRemoveCmd)
 
-	orgCmd.AddCommand(listCmd, createCmd, showCmd, updateCmd, deleteCmd, logoCmd)
+	orgCmd.AddCommand(
+		listCmd,
+		createCmd,
+		showCmd,
+		updateCmd,
+		deleteCmd,
+		logoCmd,
+		newNumberRangeCmd(opts),
+		newGeoProviderCmd(opts),
+	)
 	return orgCmd
 }
 

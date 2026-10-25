@@ -43,6 +43,9 @@ defmodule FaciqorWeb.Router do
       live "/settings/profile", ProfileSettingsLive, :index
       live "/orgs/new", OrgNewLive, :new
       live "/orgs/:handle/settings", OrgSettingsLive, :edit
+      live "/orgs/:handle/facilities", FacilityIndexLive, :index
+      live "/orgs/:handle/facilities/new", FacilityFormLive, :new
+      live "/orgs/:handle/facilities/:id", FacilityFormLive, :edit
     end
   end
 end

@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package faciqor.v1;
+option go_package = "faciqor/pkg/api/v1;v1";
+
+enum MapProvider {
+  MAP_PROVIDER_UNSPECIFIED = 0;
+  MAP_PROVIDER_OPENSTREETMAP = 1;
+  MAP_PROVIDER_HERE = 2;
+}
+
+enum GeocodingProvider {
+  GEOCODING_PROVIDER_UNSPECIFIED = 0;
+  GEOCODING_PROVIDER_NOMINATIM = 1;
+  GEOCODING_PROVIDER_HERE = 2;
+}
+
+enum NumberRangeEntityType {
+  NUMBER_RANGE_ENTITY_TYPE_UNSPECIFIED = 0;
+  NUMBER_RANGE_ENTITY_TYPE_FACILITY = 1;
+}
+
+service OperationsService {
+  // Geo Provider Configuration (per Organization or bulk for all owned orgs)
+  rpc GetGeoProviderConfig (GetGeoProviderConfigRequest) returns (GeoProviderConfigResponse);
+  rpc UpdateGeoProviderConfig (UpdateGeoProviderConfigRequest) returns (GeoProviderConfigResponse);
+
+  // Number Ranges
+  rpc GetNumberRange (GetNumberRangeRequest) returns (NumberRangeResponse);
+  rpc UpdateNumberRange (UpdateNumberRangeRequest) returns (NumberRangeResponse);
+
+  // Facilities CRUD
+  rpc ListFacilities (ListFacilitiesRequest) returns (ListFacilitiesResponse);
+  rpc GetFacility (GetFacilityRequest) returns (FacilityResponse);
+  rpc CreateFacility (CreateFacilityRequest) returns (FacilityResponse);
+  rpc UpdateFacility (UpdateFacilityRequest) returns (FacilityResponse);
+  rpc ArchiveFacility (ArchiveFacilityRequest) returns (FacilityResponse);
+  rpc UnarchiveFacility (UnarchiveFacilityRequest) returns (FacilityResponse);
+  rpc DeleteFacility (DeleteFacilityRequest) returns (DeleteFacilityResponse);
+}
+
+message GeoCoordinate {
+  string latitude = 1;  // Decimal string, e.g. "52.5200066"
+  string longitude = 2; // Decimal string, e.g. "13.4049540"
+}
+
+message FacilityAddressInput {
+  string street = 1;
+  string house_number = 2;
+  string postal_code = 3;
+  string city = 4;
+  optional string country_code = 5;
+  optional string latitude = 6;
+  optional string longitude = 7;
+  optional bool is_primary = 8;
+}
+
+message FacilityAddressItem {
+  string id = 1;
+  string street = 2;
+  string house_number = 3;
+  string postal_code = 4;
+  string city = 5;
+  string country_code = 6;
+  string latitude = 7;
+  string longitude = 8;
+  bool is_primary = 9;
+  int32 sort_order = 10;
+}
+
+message GetGeoProviderConfigRequest {
+  string org_id_or_handle = 1;
+}
+
+message UpdateGeoProviderConfigRequest {
+  string org_id_or_handle = 1;
+  optional MapProvider map_provider = 2;
+  optional GeocodingProvider geocoding_provider = 3;
+  optional string here_api_key = 4;
+  bool apply_to_all_owned_orgs = 5;
+}
+
+message GeoProviderConfigResponse {
+  string organization_id = 1;
+  string organization_handle = 2;
+  MapProvider map_provider = 3;
+  GeocodingProvider geocoding_provider = 4;
+  bool has_here_api_key = 5;
+  repeated string updated_organization_handles = 6;
+}
+
+message GetNumberRangeRequest {
+  string org_id_or_handle = 1;
+  NumberRangeEntityType entity_type = 2;
+}
+
+message UpdateNumberRangeRequest {
+  string org_id_or_handle = 1;
+  NumberRangeEntityType entity_type = 2;
+  optional string prefix = 3;
+  optional int64 start_value = 4;
+  optional int64 current_value = 5;
+  optional int64 step = 6;
+  optional string suffix = 7;
+}
+
+message NumberRangeResponse {
+  string id = 1;
+  string organization_id = 2;
+  NumberRangeEntityType entity_type = 3;
+  string prefix = 4;
+  int64 start_value = 5;
+  optional int64 current_value = 6;
+  int64 step = 7;
+  string suffix = 8;
+  string preview_next_key = 9;
+}
+
+message ListFacilitiesRequest {
+  string org_id_or_handle = 1;
+  bool include_archived = 2;
+}
+
+message ListFacilitiesResponse {
+  repeated FacilityResponse facilities = 1;
+}
+
+message GetFacilityRequest {
+  string org_id_or_handle = 1;
+  string id_or_business_key = 2;
+}
+
+message CreateFacilityRequest {
+  string org_id_or_handle = 1;
+  repeated FacilityAddressInput addresses = 2;
+  repeated GeoCoordinate geofence_polygon = 3;
+  optional int32 geofence_radius_meters = 4;
+}
+
+message UpdateFacilityRequest {
+  string org_id_or_handle = 1;
+  string id_or_business_key = 2;
+  repeated FacilityAddressInput addresses = 3;
+  repeated GeoCoordinate geofence_polygon = 4;
+  optional int32 geofence_radius_meters = 5;
+}
+
+message ArchiveFacilityRequest {
+  string org_id_or_handle = 1;
+  string id_or_business_key = 2;
+}
+
+message UnarchiveFacilityRequest {
+  string org_id_or_handle = 1;
+  string id_or_business_key = 2;
+}
+
+message DeleteFacilityRequest {
+  string org_id_or_handle = 1;
+  string id_or_business_key = 2;
+}
+
+message DeleteFacilityResponse {
+  bool deleted = 1;
+}
+
+message FacilityResponse {
+  string id = 1;
+  string organization_id = 2;
+  string business_key = 3;
+  string title = 4;
+  repeated FacilityAddressItem addresses = 5;
+  repeated GeoCoordinate geofence_polygon = 6;
+  int32 geofence_radius_meters = 7;
+  optional string archived_at = 8;
+  string inserted_at = 9;
+  string updated_at = 10;
+}

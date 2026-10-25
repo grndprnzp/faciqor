@@ -160,3 +160,134 @@ func orgToMap(org *v1.OrganizationResponse) map[string]interface{} {
 	}
 	return m
 }
+
+func PrintFacility(w io.Writer, f *v1.FacilityResponse, asJSON bool) error {
+	if asJSON {
+		return PrintJSON(w, facilityToMap(f))
+	}
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(tw, "ID:\t%s\n", f.Id)
+	fmt.Fprintf(tw, "BUSINESS KEY:\t%s\n", f.BusinessKey)
+	fmt.Fprintf(tw, "TITLE:\t%s\n", f.Title)
+	fmt.Fprintf(tw, "GEOFENCE RADIUS:\t%dm (%d Eckpunkte)\n", f.GeofenceRadiusMeters, len(f.GeofencePolygon))
+	if f.ArchivedAt != nil && *f.ArchivedAt != "" {
+		fmt.Fprintf(tw, "ARCHIVED AT:\t%s\n", *f.ArchivedAt)
+	}
+	fmt.Fprintf(tw, "ADDRESSES:\t%d\n", len(f.Addresses))
+	for _, a := range f.Addresses {
+		prim := ""
+		if a.IsPrimary {
+			prim = " [PRIMARY]"
+		}
+		fmt.Fprintf(tw, "  - %s %s, %s %s (%s)\tLat: %s, Lon: %s%s\n",
+			a.Street, a.HouseNumber, a.PostalCode, a.City, a.CountryCode, a.Latitude, a.Longitude, prim)
+	}
+	return tw.Flush()
+}
+
+func PrintFacilityList(w io.Writer, facilities []*v1.FacilityResponse, asJSON bool) error {
+	if asJSON {
+		items := make([]map[string]interface{}, 0, len(facilities))
+		for _, f := range facilities {
+			items = append(items, facilityToMap(f))
+		}
+		return PrintJSON(w, items)
+	}
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tBUSINESS KEY\tTITLE\tADDRESSES\tSTATUS")
+	for _, f := range facilities {
+		status := "ACTIVE"
+		if f.ArchivedAt != nil && *f.ArchivedAt != "" {
+			status = "ARCHIVED"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n",
+			f.Id, f.BusinessKey, f.Title, len(f.Addresses), status)
+	}
+	return tw.Flush()
+}
+
+func facilityToMap(f *v1.FacilityResponse) map[string]interface{} {
+	addrs := make([]map[string]interface{}, 0, len(f.Addresses))
+	for _, a := range f.Addresses {
+		addrs = append(addrs, map[string]interface{}{
+			"id":           a.Id,
+			"street":       a.Street,
+			"house_number": a.HouseNumber,
+			"postal_code":  a.PostalCode,
+			"city":         a.City,
+			"country_code": a.CountryCode,
+			"latitude":     a.Latitude,
+			"longitude":    a.Longitude,
+			"is_primary":   a.IsPrimary,
+			"sort_order":   a.SortOrder,
+		})
+	}
+	m := map[string]interface{}{
+		"id":                     f.Id,
+		"organization_id":        f.OrganizationId,
+		"business_key":           f.BusinessKey,
+		"title":                  f.Title,
+		"addresses":              addrs,
+		"geofence_radius_meters": f.GeofenceRadiusMeters,
+		"inserted_at":            f.InsertedAt,
+		"updated_at":             f.UpdatedAt,
+	}
+	if f.ArchivedAt != nil {
+		m["archived_at"] = *f.ArchivedAt
+	}
+	return m
+}
+
+func PrintNumberRange(w io.Writer, nr *v1.NumberRangeResponse, asJSON bool) error {
+	if asJSON {
+		m := map[string]interface{}{
+			"id":               nr.Id,
+			"organization_id":  nr.OrganizationId,
+			"entity_type":      nr.EntityType.String(),
+			"prefix":           nr.Prefix,
+			"start_value":      nr.StartValue,
+			"step":             nr.Step,
+			"suffix":           nr.Suffix,
+			"preview_next_key": nr.PreviewNextKey,
+		}
+		if nr.CurrentValue != nil {
+			m["current_value"] = *nr.CurrentValue
+		}
+		return PrintJSON(w, m)
+	}
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(tw, "PREFIX:\t%s\n", nr.Prefix)
+	fmt.Fprintf(tw, "START VALUE:\t%d\n", nr.StartValue)
+	if nr.CurrentValue != nil {
+		fmt.Fprintf(tw, "CURRENT VALUE:\t%d\n", *nr.CurrentValue)
+	} else {
+		fmt.Fprintf(tw, "CURRENT VALUE:\t(noch nicht vergeben)\n")
+	}
+	fmt.Fprintf(tw, "STEP:\t%d\n", nr.Step)
+	fmt.Fprintf(tw, "SUFFIX:\t%s\n", nr.Suffix)
+	fmt.Fprintf(tw, "NEXT BUSINESS KEY:\t%s\n", nr.PreviewNextKey)
+	return tw.Flush()
+}
+
+func PrintGeoProviderConfig(w io.Writer, cfg *v1.GeoProviderConfigResponse, asJSON bool) error {
+	if asJSON {
+		return PrintJSON(w, map[string]interface{}{
+			"organization_id":              cfg.OrganizationId,
+			"organization_handle":          cfg.OrganizationHandle,
+			"map_provider":                 cfg.MapProvider.String(),
+			"geocoding_provider":           cfg.GeocodingProvider.String(),
+			"has_here_api_key":             cfg.HasHereApiKey,
+			"updated_organization_handles": cfg.UpdatedOrganizationHandles,
+		})
+	}
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(tw, "ORGANIZATION:\t@%s\n", cfg.OrganizationHandle)
+	fmt.Fprintf(tw, "MAP PROVIDER:\t%s\n", cfg.MapProvider.String())
+	fmt.Fprintf(tw, "GEOCODING PROVIDER:\t%s\n", cfg.GeocodingProvider.String())
+	fmt.Fprintf(tw, "HERE API KEY SET:\t%v\n", cfg.HasHereApiKey)
+	return tw.Flush()
+}

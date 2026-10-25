@@ -23,9 +23,12 @@ defmodule Faciqor.Accounts.Changes.CreateOwnerMembership do
           )
           |> Ash.create!(authorize?: false)
 
+          Faciqor.Operations.ensure_default_number_range(org.id, :facility)
+
           {:ok, org}
 
         _ ->
+          Faciqor.Operations.ensure_default_number_range(org.id, :facility)
           {:ok, org}
       end
     end)

@@ -11,6 +11,7 @@ import (
 )
 
 type Factory func(endpoint, token string) (v1.IdentityServiceClient, func() error, error)
+type OperationsFactory func(endpoint, token string) (v1.OperationsServiceClient, func() error, error)
 
 func DefaultFactory(endpoint, token string) (v1.IdentityServiceClient, func() error, error) {
 	conn, err := grpc.NewClient(
@@ -23,6 +24,19 @@ func DefaultFactory(endpoint, token string) (v1.IdentityServiceClient, func() er
 	}
 
 	return v1.NewIdentityServiceClient(conn), conn.Close, nil
+}
+
+func DefaultOperationsFactory(endpoint, token string) (v1.OperationsServiceClient, func() error, error) {
+	conn, err := grpc.NewClient(
+		endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(authUnaryInterceptor(token)),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect to %s: %w", endpoint, err)
+	}
+
+	return v1.NewOperationsServiceClient(conn), conn.Close, nil
 }
 
 func authUnaryInterceptor(token string) grpc.UnaryClientInterceptor {

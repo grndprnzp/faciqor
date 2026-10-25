@@ -6,11 +6,12 @@ defmodule FaciqorWeb.OrgSettingsLive do
   alias Faciqor.Media.ImageProcessing
   alias Faciqor.Media.Storage
   alias Faciqor.Media.Workers.ProcessImageVariants
+  alias Faciqor.Operations
+  alias Faciqor.Operations.NumberRange
 
   @impl true
   def mount(%{"handle" => handle}, _session, socket) do
     user = socket.assigns.current_user
-
     clean_handle = handle |> to_string() |> String.trim_leading("@")
 
     case Accounts.get_organization_by_id_or_handle(clean_handle, actor: user) do
@@ -19,6 +20,7 @@ defmodule FaciqorWeb.OrgSettingsLive do
         role = find_user_role(org, user.id)
         is_owner? = role == :owner
         logo_url = resolve_logo_url(org)
+        {:ok, number_range} = Operations.get_number_range(:facility, actor: user, tenant: org.id)
 
         {:ok,
          socket
@@ -26,7 +28,13 @@ defmodule FaciqorWeb.OrgSettingsLive do
          |> assign(:current_org, org)
          |> assign(:my_role, role)
          |> assign(:is_owner?, is_owner?)
-         |> assign(:logo_url, logo_url)}
+         |> assign(:logo_url, logo_url)
+         |> assign(:number_range, number_range)
+         |> assign(:nr_preview, NumberRange.preview_next_key(number_range))
+         |> assign(:map_provider, to_string(org.map_provider || :openstreetmap))
+         |> assign(:geocoding_provider, to_string(org.geocoding_provider || :nominatim))
+         |> assign(:here_api_key, org.here_api_key || "")
+         |> assign(:apply_to_all_owned_orgs, false)}
 
       {:error, _} ->
         {:ok,
@@ -69,6 +77,112 @@ defmodule FaciqorWeb.OrgSettingsLive do
 
       {:error, _err} ->
         {:noreply, put_flash(socket, :error, "Änderungen konnten nicht gespeichert werden.")}
+    end
+  end
+
+  def handle_event("preview_number_range", params, socket) do
+    nr = socket.assigns.number_range
+
+    preview_attrs = %{
+      prefix: params["prefix"] || "",
+      start_value: parse_int(params["start_value"], nr.start_value),
+      current_value: parse_optional_int(params["current_value"], nr.current_value),
+      step: parse_int(params["step"], nr.step),
+      suffix: params["suffix"] || ""
+    }
+
+    {:noreply, assign(socket, :nr_preview, NumberRange.preview_next_key(preview_attrs, Date.utc_today()))}
+  end
+
+  def handle_event("save_number_range", params, socket) do
+    user = socket.assigns.current_user
+    org = socket.assigns.org
+    nr = socket.assigns.number_range
+
+    attrs = %{
+      entity_type: :facility,
+      prefix: params["prefix"] || "",
+      start_value: parse_int(params["start_value"], nr.start_value),
+      current_value: parse_optional_int(params["current_value"], nil),
+      step: parse_int(params["step"], nr.step),
+      suffix: params["suffix"] || ""
+    }
+
+    case Operations.update_number_range(attrs, actor: user, tenant: org.id) do
+      {:ok, updated_nr} ->
+        {:noreply,
+         socket
+         |> assign(:number_range, updated_nr)
+         |> assign(:nr_preview, NumberRange.preview_next_key(updated_nr))
+         |> put_flash(:info, "Nummernkreis erfolgreich gespeichert.")}
+
+      {:error, _err} ->
+        {:noreply, put_flash(socket, :error, "Nummernkreis konnte nicht gespeichert werden.")}
+    end
+  end
+
+  def handle_event("change_geo_provider", params, socket) do
+    map_p = params["map_provider"] || socket.assigns.map_provider
+    geo_p = params["geocoding_provider"] || socket.assigns.geocoding_provider
+    api_key = Map.get(params, "here_api_key", socket.assigns.here_api_key)
+    apply_all? = params["apply_to_all_owned_orgs"] == "true"
+
+    {:noreply,
+     socket
+     |> assign(:map_provider, map_p)
+     |> assign(:geocoding_provider, geo_p)
+     |> assign(:here_api_key, api_key)
+     |> assign(:apply_to_all_owned_orgs, apply_all?)}
+  end
+
+  def handle_event("save_geo_provider", params, socket) do
+    user = socket.assigns.current_user
+    org = socket.assigns.org
+
+    map_provider = parse_map_provider(params["map_provider"])
+    geocoding_provider = parse_geocoding_provider(params["geocoding_provider"])
+    here_api_key = String.trim(params["here_api_key"] || "")
+    apply_all? = params["apply_to_all_owned_orgs"] == "true"
+
+    attrs = %{
+      map_provider: map_provider,
+      geocoding_provider: geocoding_provider,
+      here_api_key: if(here_api_key == "", do: nil, else: here_api_key)
+    }
+
+    case Accounts.update_geo_provider_config(
+           org,
+           attrs,
+           actor: user,
+           apply_to_all_owned_orgs: apply_all?
+         ) do
+      {:ok, updated_org, updated_handles} ->
+        updated_org = Ash.load!(updated_org, [:memberships, :logo_blob], actor: user)
+
+        msg =
+          if apply_all? and length(updated_handles) > 1 do
+            "Karten- & Geo-Provider für #{length(updated_handles)} Organisationen gespeichert (#{Enum.map_join(updated_handles, ", ", &("@" <> &1))})."
+          else
+            "Karten- & Geo-Provider-Einstellungen wurden gespeichert."
+          end
+
+        {:noreply,
+         socket
+         |> assign(:org, updated_org)
+         |> assign(:current_org, updated_org)
+         |> assign(:map_provider, to_string(updated_org.map_provider))
+         |> assign(:geocoding_provider, to_string(updated_org.geocoding_provider))
+         |> assign(:here_api_key, updated_org.here_api_key || "")
+         |> assign(:apply_to_all_owned_orgs, false)
+         |> put_flash(:info, msg)}
+
+      {:error, _err} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Provider-Einstellungen konnten nicht gespeichert werden. Bei Auswahl von HERE Maps ist ein API-Schlüssel erforderlich."
+         )}
     end
   end
 
@@ -205,11 +319,40 @@ defmodule FaciqorWeb.OrgSettingsLive do
   defp parse_focus("service_provider", _), do: :service_provider
   defp parse_focus(_, fallback), do: fallback
 
+  defp parse_map_provider("here"), do: :here
+  defp parse_map_provider(_), do: :openstreetmap
+
+  defp parse_geocoding_provider("here"), do: :here
+  defp parse_geocoding_provider(_), do: :nominatim
+
+  defp parse_int(val, fallback) when is_binary(val) do
+    case Integer.parse(String.trim(val)) do
+      {n, ""} when n > 0 -> n
+      _ -> fallback
+    end
+  end
+
+  defp parse_int(val, _fallback) when is_integer(val) and val > 0, do: val
+  defp parse_int(_, fallback), do: fallback
+
+  defp parse_optional_int(nil, fallback), do: fallback
+  defp parse_optional_int("", _fallback), do: nil
+
+  defp parse_optional_int(val, fallback) when is_binary(val) do
+    case Integer.parse(String.trim(val)) do
+      {n, ""} when n >= 0 -> n
+      _ -> fallback
+    end
+  end
+
+  defp parse_optional_int(val, _fallback) when is_integer(val) and val >= 0, do: val
+  defp parse_optional_int(_, fallback), do: fallback
+
   @impl true
   def render(assigns) do
     ~H"""
     <div class="space-y-6">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div class="flex items-center gap-2">
             <h1 class="text-2xl font-bold text-[var(--fq-color-text-main)] fq-mono">
@@ -220,6 +363,15 @@ defmodule FaciqorWeb.OrgSettingsLive do
           <p class="text-sm text-[var(--fq-color-text-muted)]">
             Organisations-Stammdaten &amp; Mandanten-Konfiguration
           </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <a
+            href={~p"/orgs/#{@org.handle}/facilities"}
+            class="inline-flex items-center justify-center rounded-md px-4 font-medium h-11 lg:h-9 text-sm bg-[var(--fq-color-primary)] text-white hover:bg-[var(--fq-color-primary-hover)]"
+          >
+            Objekte &amp; Liegenschaften verwalten
+          </a>
         </div>
       </div>
 
@@ -336,7 +488,7 @@ defmodule FaciqorWeb.OrgSettingsLive do
         </div>
       </section>
 
-      <form phx-submit="save_org" class="space-y-6">
+      <form id="org-stammdaten-form" phx-submit="save_org" class="space-y-6">
         <%!-- Section A: Identity & Primary Focus --%>
         <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
           <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
@@ -451,14 +603,175 @@ defmodule FaciqorWeb.OrgSettingsLive do
         </section>
       </form>
 
-      <%!-- Section C: Danger Zone (Visible only for :owner) --%>
+      <%!-- Section C: Nummernkreise (BusinessKey-Verwaltung) --%>
+      <form id="org-number-range-form" phx-submit="save_number_range" phx-change="preview_number_range">
+        <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
+                Sektion C – Nummernkreise (Objekt-BusinessKey)
+              </h2>
+              <p class="text-xs text-[var(--fq-color-text-muted)]">
+                Format: <code class="fq-mono">&#123;Präfix&#125;&#123;AktuellerWert&#125;&#123;Suffix&#125;</code>. Unterstützte Datums-Makros in Präfix &amp; Suffix:
+                <code class="fq-mono">&#123;&#123;Jahr&#125;&#125;</code>, <code class="fq-mono">&#123;&#123;Monat&#125;&#125;</code>, <code class="fq-mono">&#123;&#123;Tag&#125;&#125;</code>.
+              </p>
+            </div>
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)]">
+              <span class="text-xs text-[var(--fq-color-text-muted)]">Nächster BusinessKey:</span>
+              <span id="nr-preview-badge" class="fq-mono tabular-nums font-bold text-xs text-[var(--fq-color-primary)]">
+                <%= @nr_preview %>
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <.input
+              id="nr-prefix"
+              name="prefix"
+              label="Präfix (optional)"
+              monospace={true}
+              value={@number_range.prefix || ""}
+              readonly={not @is_owner?}
+            />
+            <.input
+              id="nr-start-value"
+              name="start_value"
+              type="number"
+              label="Startwert"
+              monospace={true}
+              value={@number_range.start_value}
+              readonly={not @is_owner?}
+            />
+            <.input
+              id="nr-current-value"
+              name="current_value"
+              type="number"
+              label="Aktueller Wert"
+              monospace={true}
+              value={@number_range.current_value}
+              readonly={not @is_owner?}
+            />
+            <.input
+              id="nr-step"
+              name="step"
+              type="number"
+              label="Schrittweite"
+              monospace={true}
+              value={@number_range.step}
+              readonly={not @is_owner?}
+            />
+            <.input
+              id="nr-suffix"
+              name="suffix"
+              label="Suffix (optional)"
+              monospace={true}
+              value={@number_range.suffix || ""}
+              readonly={not @is_owner?}
+            />
+          </div>
+
+          <div :if={@is_owner?} class="pt-2">
+            <.button type="submit">
+              Nummernkreis speichern
+            </.button>
+          </div>
+        </section>
+      </form>
+
+      <%!-- Section D: Kartenanbieter & Geo-Suche --%>
+      <form id="org-geo-provider-form" phx-submit="save_geo_provider" phx-change="change_geo_provider">
+        <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
+          <div>
+            <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
+              Sektion D – Kartenanbieter &amp; Geo-Suche
+            </h2>
+            <p class="text-xs text-[var(--fq-color-text-muted)]">
+              Standardmäßig sind OpenStreetMap (Karte) und Nominatim (Geo-Suche) aktiv. Alternativ können Sie Ihr bestehendes HERE Maps Abonnement hinterlegen.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label for="org-map-provider" class="block text-xs font-medium text-[var(--fq-color-text-main)]">
+                Kartenanbieter (Map Tiles)
+              </label>
+              <select
+                id="org-map-provider"
+                name="map_provider"
+                disabled={not @is_owner?}
+                class="w-full rounded-md border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-surface)] px-3 text-sm text-[var(--fq-color-text-main)] h-11 lg:h-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+              >
+                <option value="openstreetmap" selected={@map_provider == "openstreetmap"}>
+                  OpenStreetMap (Standard)
+                </option>
+                <option value="here" selected={@map_provider == "here"}>
+                  HERE Maps
+                </option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label for="org-geocoding-provider" class="block text-xs font-medium text-[var(--fq-color-text-main)]">
+                Geo-Suche &amp; Adressvervollständigung
+              </label>
+              <select
+                id="org-geocoding-provider"
+                name="geocoding_provider"
+                disabled={not @is_owner?}
+                class="w-full rounded-md border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-surface)] px-3 text-sm text-[var(--fq-color-text-main)] h-11 lg:h-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+              >
+                <option value="nominatim" selected={@geocoding_provider == "nominatim"}>
+                  Nominatim / OpenStreetMap (Standard)
+                </option>
+                <option value="here" selected={@geocoding_provider == "here"}>
+                  HERE Maps Geocoding &amp; Search API
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <.input
+              id="org-here-api-key"
+              name="here_api_key"
+              type="password"
+              label="HERE Maps API-Schlüssel (Pflicht bei Auswahl von HERE Maps)"
+              monospace={true}
+              value={@here_api_key}
+              readonly={not @is_owner?}
+            />
+          </div>
+
+          <div :if={@is_owner?} class="flex items-center gap-2 pt-1">
+            <input
+              id="org-apply-all-owned"
+              type="checkbox"
+              name="apply_to_all_owned_orgs"
+              value="true"
+              checked={@apply_to_all_owned_orgs}
+              class="h-4 w-4 rounded border-[var(--fq-color-border-strong)] text-[var(--fq-color-primary)] focus:ring-[#2563EB]"
+            />
+            <label for="org-apply-all-owned" class="text-xs font-medium text-[var(--fq-color-text-main)]">
+              Provider-Konfiguration für alle Organisationen übernehmen, in denen ich Owner bin
+            </label>
+          </div>
+
+          <div :if={@is_owner?} class="pt-2">
+            <.button type="submit">
+              Provider-Konfiguration speichern
+            </.button>
+          </div>
+        </section>
+      </form>
+
+      <%!-- Section E: Danger Zone (Visible only for :owner) --%>
       <section
         :if={@is_owner?}
         id="org-danger-zone"
         class="bg-[var(--fq-color-bg-surface)] border-2 border-[var(--fq-status-danger)] rounded-lg p-6 space-y-4"
       >
         <h2 class="text-base font-bold text-[#991B1B]">
-          Sektion C – Gefahrenzone
+          Sektion E – Gefahrenzone
         </h2>
         <p class="text-xs text-[var(--fq-color-text-muted)]">
           Die Organisation wird für 60 Tage gesperrt und anschließend endgültig gelöscht.

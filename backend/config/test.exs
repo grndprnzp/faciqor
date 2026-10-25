@@ -16,6 +16,7 @@ config :faciqor, FaciqorWeb.Endpoint,
 config :faciqor, :token_signing_secret, "test_token_signing_secret_at_least_32_bytes_long_1234567890"
 
 config :faciqor, Oban, testing: :manual
+config :faciqor, :geo_provider_adapter, Faciqor.Geo.Providers.Mock
 
 config :ex_aws,
   access_key_id: "test",

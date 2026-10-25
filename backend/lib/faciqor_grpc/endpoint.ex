@@ -5,4 +5,5 @@ defmodule FaciqorGrpc.Endpoint do
   intercept FaciqorGrpc.Interceptors.Auth
 
   run FaciqorGrpc.Services.IdentityService
+  run FaciqorGrpc.Services.OperationsService
 end

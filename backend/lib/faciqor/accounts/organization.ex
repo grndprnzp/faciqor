@@ -63,6 +63,26 @@ defmodule Faciqor.Accounts.Organization do
 
     attribute :logo_blob_id, :uuid, public?: true
 
+    attribute :map_provider, :atom do
+      allow_nil? false
+      default :openstreetmap
+      public? true
+      constraints one_of: [:openstreetmap, :here]
+    end
+
+    attribute :geocoding_provider, :atom do
+      allow_nil? false
+      default :nominatim
+      public? true
+      constraints one_of: [:nominatim, :here]
+    end
+
+    attribute :here_api_key, :string do
+      allow_nil? true
+      public? true
+      sensitive? true
+    end
+
     create_timestamp :inserted_at
     update_timestamp :updated_at
   end
@@ -167,6 +187,28 @@ defmodule Faciqor.Accounts.Organization do
       require_atomic? false
       change set_attribute(:deleted_at, nil)
       change set_attribute(:deletion_reason, nil)
+    end
+
+    update :update_geo_settings do
+      require_atomic? false
+      accept [:map_provider, :geocoding_provider, :here_api_key]
+
+      validate fn changeset, _context ->
+        map_p = Ash.Changeset.get_attribute(changeset, :map_provider)
+        geo_p = Ash.Changeset.get_attribute(changeset, :geocoding_provider)
+        api_key = Ash.Changeset.get_attribute(changeset, :here_api_key)
+
+        needs_here_key? = map_p == :here or geo_p == :here
+        has_key? = is_binary(api_key) and String.trim(api_key) != ""
+
+        if needs_here_key? and not has_key? do
+          {:error,
+           field: :here_api_key,
+           message: "Für die Nutzung von HERE Maps muss ein gültiger HERE API-Schlüssel hinterlegt werden."}
+        else
+          :ok
+        end
+      end
     end
   end
 

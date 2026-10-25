@@ -31,7 +31,7 @@ faciqor/
 ├── buf.gen.yaml                    # Multi-Language Codegen Definition
 │
 ├── docker/                         # LOKALE INFRASTRUKTUR & CONTAINER
-│   ├── compose.yml                 # PostgreSQL 16 & SeaweedFS (S3 Object Storage)
+│   ├── compose.yml                 # PostgreSQL 16 (+ PostGIS 3.5) & SeaweedFS (S3 Object Storage)
 │   ├── .env                        # Lokale Port- & Zugangsdatenkonfiguration
 │   └── .env.example
 │
@@ -40,7 +40,7 @@ faciqor/
 │   │   ├── 0001-elixir-core.md
 │   │   ├── 0002-go-grpc-cli.md
 │   │   └── 0003-flutter-offline-sync.md
-│   ├── requirements/               # Anforderungskataloge (FA-01 bis FA-06, NFA-01 bis NFA-04)
+│   ├── requirements/               # Anforderungskataloge (001-milrestone.md, 002-facilities-and-locations.md, ...)
 │   ├── compliance/                 # BetrKV-, GEFMA- und GoBD-Spezifikationen
 │   └── architecture_and_projectfolder_layout.md # DIESES DOKUMENT
 │
@@ -51,7 +51,9 @@ faciqor/
 │   └── faciqor/
 │       └── v1/
 │           ├── common.proto        # Shared Types (UUID, Timestamp, Money/Decimal, GeoPoint)
-│           ├── auth.proto          # Token-Exchange, Authentifizierung
+│           ├── auth.proto          # Token-Exchange, Authentifizierung, Organisationen
+│           ├── media.proto         # S3 Pre-Signed Upload Tickets & Avatar/Logo-Verwaltung
+│           ├── operations.proto    # Liegenschaften (Facilities), Teiladressen, Geofences, Nummernkreise & Geo-Provider
 │           ├── accounting.proto    # Buchungsjournal, DATEV-Export, BetrKV-Logik
 │           └── field.proto         # Vor-Ort-Erfassung, Geofencing, Check-in, Foto-Hashes
 │
@@ -66,9 +68,10 @@ faciqor/
 │   │   ├── faciqor/                # DOMÄNENKERN (Ash Domains, Ecto, Business Rules)
 │   │   │   ├── accounts/           # Benutzer, Rollen, Mandanten (RLS)
 │   │   │   ├── accounting/         # Buchungsjournal, BetrKV-Regelwerk, DATEV
-│   │   │   ├── operations/         # Liegenschaften, Einheiten, GEFMA-Kataloge
+│   │   │   ├── operations/         # Liegenschaften, Teiladressen, Nummernkreise, GEFMA-Kataloge
+│   │   │   ├── geo/                # Geocoding-Abstraktion (Nominatim, HERE Maps) & PostGIS Geofence-Helfer
 │   │   │   ├── media/              # Bildverarbeitung (Vix/libvips), S3-Storage-Adapter, Oban Worker
-│   │   │   └── repo.ex             # Ecto Repo mit RLS Tenant-Scoping
+│   │   │   └── repo.ex             # Ecto Repo mit RLS Tenant-Scoping & PostGIS-Erweiterung
 │   │   ├── faciqor_web/            # FACIQOR HUB (Phoenix LiveView für Office-Personal)
 │   │   │   ├── endpoint.ex
 │   │   │   ├── router.ex           # Web-Routen & Session-Pipelines

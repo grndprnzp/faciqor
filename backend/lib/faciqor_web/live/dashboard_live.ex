@@ -100,12 +100,20 @@ defmodule FaciqorWeb.DashboardLive do
               <.status_badge status={user_role_in_org(org, @current_user.id)} />
             </:col>
             <:action :let={org}>
-              <a
-                href={~p"/orgs/#{org.handle}/settings"}
-                class="text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
-              >
-                Einstellungen
-              </a>
+              <div class="flex items-center justify-end gap-3">
+                <a
+                  href={~p"/orgs/#{org.handle}/facilities"}
+                  class="text-xs font-semibold text-[var(--fq-color-primary)] hover:underline"
+                >
+                  Objekte
+                </a>
+                <a
+                  href={~p"/orgs/#{org.handle}/settings"}
+                  class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-text-main)] hover:underline"
+                >
+                  Einstellungen
+                </a>
+              </div>
             </:action>
           </.table>
         </div>
