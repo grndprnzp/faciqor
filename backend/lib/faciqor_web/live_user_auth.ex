@@ -81,7 +81,7 @@ defmodule FaciqorWeb.LiveUserAuth do
     if user_id do
       Accounts.User
       |> Ash.Query.filter(id == ^user_id)
-      |> Ash.Query.load([:email_verified?, :verification_grace_expired?, :purge_at])
+      |> Ash.Query.load([:email_verified?, :verification_grace_expired?, :purge_at, :avatar_blob])
       |> Ash.read_one(authorize?: false)
       |> case do
         {:ok, user} -> user
@@ -98,7 +98,7 @@ defmodule FaciqorWeb.LiveUserAuth do
   defp load_user_orgs(user) do
     Accounts.Organization
     |> Ash.Query.filter(is_nil(deleted_at))
-    |> Ash.Query.load(:memberships)
+    |> Ash.Query.load([:memberships, :logo_blob])
     |> Ash.read!(actor: user)
   end
 end

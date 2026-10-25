@@ -64,6 +64,13 @@ defmodule FaciqorWeb.Layouts do
             <span class="text-xs text-[var(--fq-color-text-muted)]">Mandant:</span>
             <%= if assigns[:current_org] do %>
               <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md border border-[var(--fq-color-border)] bg-[var(--fq-color-bg-muted)]">
+                <%= if org_logo_url(assigns[:current_org]) do %>
+                  <img
+                    src={org_logo_url(assigns[:current_org])}
+                    alt="Logo"
+                    class="w-4 h-4 rounded object-cover border border-[var(--fq-color-border)]"
+                  />
+                <% end %>
                 <span class="fq-mono font-medium text-xs">@<%= assigns[:current_org].handle %></span>
                 <.status_badge status={org_role(assigns[:current_org], @current_user)} />
               </div>
@@ -84,9 +91,17 @@ defmodule FaciqorWeb.Layouts do
             href={~p"/settings/profile"}
             class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-text-main)] flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[var(--fq-color-bg-muted)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
           >
-            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)] text-[var(--fq-color-text-main)] font-semibold text-[10px]">
-              <%= user_initials(@current_user) %>
-            </span>
+            <%= if user_avatar_url(@current_user) do %>
+              <img
+                src={user_avatar_url(@current_user)}
+                alt="Avatar"
+                class="w-6 h-6 rounded-full object-cover border border-[var(--fq-color-border)] shadow-2xs"
+              />
+            <% else %>
+              <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)] text-[var(--fq-color-text-main)] font-semibold text-[10px]">
+                <%= user_initials(@current_user) %>
+              </span>
+            <% end %>
             <span class="font-medium text-[var(--fq-color-text-main)]"><%= user_display(@current_user) %></span>
             <span class="text-[var(--fq-color-text-muted)] text-[11px] hidden sm:inline">(Profil &amp; CLI)</span>
           </a>
@@ -161,4 +176,26 @@ defmodule FaciqorWeb.Layouts do
   end
 
   defp user_initials(_), do: "U"
+
+  defp user_avatar_url(%{avatar_blob: %{variants: %{"64" => key}}}) when is_binary(key),
+    do: Faciqor.Media.Storage.public_url(key)
+
+  defp user_avatar_url(%{avatar_blob: %{variants: %{"128" => key}}}) when is_binary(key),
+    do: Faciqor.Media.Storage.public_url(key)
+
+  defp user_avatar_url(%{avatar_blob: %{key: key}}) when is_binary(key),
+    do: Faciqor.Media.Storage.public_url(key)
+
+  defp user_avatar_url(_), do: nil
+
+  defp org_logo_url(%{logo_blob: %{variants: %{"64" => key}}}) when is_binary(key),
+    do: Faciqor.Media.Storage.public_url(key)
+
+  defp org_logo_url(%{logo_blob: %{variants: %{"128" => key}}}) when is_binary(key),
+    do: Faciqor.Media.Storage.public_url(key)
+
+  defp org_logo_url(%{logo_blob: %{key: key}}) when is_binary(key),
+    do: Faciqor.Media.Storage.public_url(key)
+
+  defp org_logo_url(_), do: nil
 end

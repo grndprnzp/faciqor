@@ -186,6 +186,7 @@ defmodule FaciqorWeb.ProfileSettingsLiveTest do
 
       assert html =~ "Avatar ändern"
       assert has_element?(view, "#avatar-cropper-trigger")
+      refute has_element?(view, "header img[alt='Avatar']")
 
       # Generate valid 512x512 image in memory
       {:ok, img} = Image.new(512, 512, color: :blue)
@@ -200,10 +201,11 @@ defmodule FaciqorWeb.ProfileSettingsLiveTest do
       updated_user = Ash.get!(User, user.id, authorize?: false)
       assert updated_user.avatar_blob_id != nil
 
-      # Check HTML renders success message and remove button
+      # Check HTML renders success message, remove button and header avatar image
       html = render(view)
       assert html =~ "Avatar erfolgreich aktualisiert"
       assert html =~ "Avatar entfernen"
+      assert has_element?(view, "header img[alt='Avatar']")
 
       # Remove avatar
       render_click(view, :remove_avatar, %{})
@@ -211,6 +213,7 @@ defmodule FaciqorWeb.ProfileSettingsLiveTest do
       user_after_removal = Ash.get!(User, user.id, authorize?: false)
       assert is_nil(user_after_removal.avatar_blob_id)
       assert render(view) =~ "Avatar wurde entfernt"
+      refute has_element?(view, "header img[alt='Avatar']")
     end
   end
 end
