@@ -10,15 +10,104 @@ defmodule FaciqorGrpc.Services.IdentityService do
     to_user_profile_response(actor)
   end
 
-  def update_my_profile(%V1.UpdateMyProfileRequest{handle: handle}, _stream) do
+  def update_my_profile(%V1.UpdateMyProfileRequest{} = req, _stream) do
     actor = current_actor!()
 
+    attrs =
+      %{}
+      |> maybe_put(:handle, req.handle)
+      |> maybe_put(:display_name, req.display_name)
+      |> maybe_put(:first_name, req.first_name)
+      |> maybe_put(:last_name, req.last_name)
+      |> maybe_put(:phone, req.phone)
+      |> maybe_put(:timezone, req.timezone)
+      |> maybe_put(:locale, req.locale)
+
     actor
-    |> Ash.Changeset.for_update(:update_profile, %{handle: handle})
+    |> Ash.Changeset.for_update(:update_profile, attrs)
     |> Ash.update(actor: actor)
     |> case do
       {:ok, updated_user} -> to_user_profile_response(updated_user)
       {:error, err} -> raise_ash_error!(err)
+    end
+  end
+
+  def change_password(%V1.ChangePasswordRequest{current_password: current, new_password: new_pass}, _stream) do
+    actor = current_actor!()
+
+    actor
+    |> Ash.Changeset.for_update(:change_password, %{
+      current_password: current,
+      password: new_pass,
+      password_confirmation: new_pass
+    })
+    |> Ash.update(actor: actor)
+    |> case do
+      {:ok, _} -> %V1.ChangePasswordResponse{success: true}
+      {:error, err} -> raise_ash_error!(err)
+    end
+  end
+
+  def request_email_change(%V1.RequestEmailChangeRequest{new_email: new_email}, _stream) do
+    actor = current_actor!()
+
+    actor
+    |> Ash.Changeset.for_update(:request_email_change, %{new_email: new_email})
+    |> Ash.update(actor: actor)
+    |> case do
+      {:ok, updated_user} ->
+        %V1.RequestEmailChangeResponse{pending_email: to_string(updated_user.pending_email)}
+
+      {:error, err} ->
+        raise_ash_error!(err)
+    end
+  end
+
+  def list_api_tokens(_req, _stream) do
+    actor = current_actor!()
+
+    tokens =
+      Accounts.ApiToken
+      |> Ash.Query.filter(user_id == ^actor.id)
+      |> Ash.Query.sort(inserted_at: :desc)
+      |> Ash.read!(actor: actor)
+
+    %V1.ListApiTokensResponse{
+      tokens: Enum.map(tokens, &to_api_token_info/1)
+    }
+  end
+
+  def create_api_token(%V1.CreateApiTokenRequest{} = req, _stream) do
+    actor = current_actor!()
+
+    opts = [actor: actor]
+    opts = if req.expires_in_days && req.expires_in_days > 0, do: Keyword.put(opts, :expires_in_days, req.expires_in_days), else: opts
+    opts = if req.scopes && req.scopes != "", do: Keyword.put(opts, :scopes, req.scopes), else: opts
+
+    case Accounts.create_personal_access_token(req.name, opts) do
+      {:ok, plain_token, record} ->
+        %V1.CreateApiTokenResponse{
+          token: to_api_token_info(record),
+          plain_token: plain_token
+        }
+
+      {:error, err} ->
+        raise_ash_error!(err)
+    end
+  end
+
+  def revoke_api_token(%V1.RevokeApiTokenRequest{token_id: token_id}, _stream) do
+    actor = current_actor!()
+
+    case Accounts.ApiToken
+         |> Ash.Query.filter(id == ^token_id and user_id == ^actor.id)
+         |> Ash.read_one(actor: actor) do
+      {:ok, %Accounts.ApiToken{} = token} ->
+        token |> Ash.Changeset.for_update(:revoke, %{}) |> Ash.update!(actor: actor)
+        %V1.RevokeApiTokenResponse{success: true}
+
+      _ ->
+        raise GRPC.RPCError, status: GRPC.Status.not_found(), message: "API Token nicht gefunden"
     end
   end
 
@@ -166,7 +255,27 @@ defmodule FaciqorGrpc.Services.IdentityService do
       email: to_string(user.email),
       handle: to_string(user.handle),
       email_verified: not is_nil(user.email_confirmed_at),
-      inserted_at: if(user.inserted_at, do: DateTime.to_iso8601(user.inserted_at), else: "")
+      inserted_at: if(user.inserted_at, do: DateTime.to_iso8601(user.inserted_at), else: ""),
+      display_name: user.display_name || "",
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      phone: user.phone || "",
+      timezone: user.timezone || "Europe/Berlin",
+      locale: user.locale || "de",
+      pending_email: if(user.pending_email, do: to_string(user.pending_email), else: nil)
+    }
+  end
+
+  defp to_api_token_info(%Accounts.ApiToken{} = t) do
+    %V1.ApiTokenInfo{
+      id: t.id,
+      name: t.name,
+      token_prefix: t.token_prefix || "",
+      scopes: t.scopes || "all",
+      inserted_at: if(t.inserted_at, do: DateTime.to_iso8601(t.inserted_at), else: ""),
+      expires_at: if(t.expires_at, do: DateTime.to_iso8601(t.expires_at), else: nil),
+      last_used_at: if(t.last_used_at, do: DateTime.to_iso8601(t.last_used_at), else: nil),
+      revoked_at: if(t.revoked_at, do: DateTime.to_iso8601(t.revoked_at), else: nil)
     }
   end
 
@@ -214,6 +323,7 @@ defmodule FaciqorGrpc.Services.IdentityService do
   defp to_proto_focus(_), do: :ORGANIZATION_FOCUS_UNSPECIFIED
 
   defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, _key, ""), do: map
   defp maybe_put(map, key, val), do: Map.put(map, key, val)
 
   defp maybe_put_focus(map, _key, nil), do: map

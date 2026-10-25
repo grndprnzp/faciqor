@@ -21,7 +21,14 @@ service IdentityService {
   // User Profile
   rpc GetMyProfile (GetMyProfileRequest) returns (UserProfileResponse);
   rpc UpdateMyProfile (UpdateMyProfileRequest) returns (UserProfileResponse);
+  rpc ChangePassword (ChangePasswordRequest) returns (ChangePasswordResponse);
+  rpc RequestEmailChange (RequestEmailChangeRequest) returns (RequestEmailChangeResponse);
   rpc RequestAccountDeletion (RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
+
+  // Personal Access Tokens
+  rpc ListApiTokens (ListApiTokensRequest) returns (ListApiTokensResponse);
+  rpc CreateApiToken (CreateApiTokenRequest) returns (CreateApiTokenResponse);
+  rpc RevokeApiToken (RevokeApiTokenRequest) returns (RevokeApiTokenResponse);
 
   // Organizations
   rpc CreateOrganization (CreateOrganizationRequest) returns (OrganizationResponse);
@@ -34,7 +41,13 @@ service IdentityService {
 message GetMyProfileRequest {}
 
 message UpdateMyProfileRequest {
-  string handle = 1;
+  optional string handle = 1;
+  optional string display_name = 2;
+  optional string first_name = 3;
+  optional string last_name = 4;
+  optional string phone = 5;
+  optional string timezone = 6;
+  optional string locale = 7;
 }
 
 message UserProfileResponse {
@@ -43,6 +56,30 @@ message UserProfileResponse {
   string handle = 3;
   bool email_verified = 4;
   string inserted_at = 5;
+  string display_name = 6;
+  string first_name = 7;
+  string last_name = 8;
+  string phone = 9;
+  string timezone = 10;
+  string locale = 11;
+  optional string pending_email = 12;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse {
+  bool success = 1;
+}
+
+message RequestEmailChangeRequest {
+  string new_email = 1;
+}
+
+message RequestEmailChangeResponse {
+  string pending_email = 1;
 }
 
 message RequestAccountDeletionRequest {}
@@ -50,6 +87,42 @@ message RequestAccountDeletionRequest {}
 message RequestAccountDeletionResponse {
   string purge_scheduled_at = 1;
   repeated string orphaned_organization_handles = 2;
+}
+
+message ApiTokenInfo {
+  string id = 1;
+  string name = 2;
+  string token_prefix = 3;
+  string scopes = 4;
+  string inserted_at = 5;
+  optional string expires_at = 6;
+  optional string last_used_at = 7;
+  optional string revoked_at = 8;
+}
+
+message ListApiTokensRequest {}
+
+message ListApiTokensResponse {
+  repeated ApiTokenInfo tokens = 1;
+}
+
+message CreateApiTokenRequest {
+  string name = 1;
+  optional int32 expires_in_days = 2;
+  optional string scopes = 3;
+}
+
+message CreateApiTokenResponse {
+  ApiTokenInfo token = 1;
+  string plain_token = 2;
+}
+
+message RevokeApiTokenRequest {
+  string token_id = 1;
+}
+
+message RevokeApiTokenResponse {
+  bool success = 1;
 }
 
 message CreateOrganizationRequest {

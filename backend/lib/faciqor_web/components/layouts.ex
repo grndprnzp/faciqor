@@ -80,9 +80,12 @@ defmodule FaciqorWeb.Layouts do
         </div>
 
         <nav class="flex items-center gap-4">
-          <a href={~p"/settings/profile"} class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-text-main)] flex items-center gap-1">
-            <span class="fq-mono">@<%= @current_user.handle %></span>
-            <span>(Profil & CLI)</span>
+          <a href={~p"/settings/profile"} class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-text-main)] flex items-center gap-2">
+            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)] text-[var(--fq-color-text-main)] font-semibold text-[10px]">
+              <%= user_initials(@current_user) %>
+            </span>
+            <span class="font-medium text-[var(--fq-color-text-main)]"><%= user_display(@current_user) %></span>
+            <span class="text-[var(--fq-color-text-muted)] text-[11px]">(Profil &amp; CLI)</span>
           </a>
         </nav>
       </header>
@@ -117,4 +120,26 @@ defmodule FaciqorWeb.Layouts do
   end
 
   defp org_role(_, _), do: :member
+
+  defp user_display(%{display_name: name}) when is_binary(name) and name != "", do: name
+  defp user_display(%{handle: handle}) when not is_nil(handle), do: "@" <> to_string(handle)
+  defp user_display(_), do: ""
+
+  defp user_initials(%{first_name: f, last_name: l}) when is_binary(f) and is_binary(l) and f != "" and l != "" do
+    String.upcase(String.slice(f, 0, 1) <> String.slice(l, 0, 1))
+  end
+
+  defp user_initials(%{display_name: name}) when is_binary(name) and name != "" do
+    name
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.take(2)
+    |> Enum.map_join("", &String.slice(&1, 0, 1))
+    |> String.upcase()
+  end
+
+  defp user_initials(%{handle: handle}) when not is_nil(handle) do
+    String.upcase(String.slice(to_string(handle), 0, 2))
+  end
+
+  defp user_initials(_), do: "U"
 end

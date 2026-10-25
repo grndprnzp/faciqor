@@ -172,7 +172,14 @@ service IdentityService {
   // User Profile
   rpc GetMyProfile (GetMyProfileRequest) returns (UserProfileResponse);
   rpc UpdateMyProfile (UpdateMyProfileRequest) returns (UserProfileResponse);
+  rpc ChangePassword (ChangePasswordRequest) returns (ChangePasswordResponse);
+  rpc RequestEmailChange (RequestEmailChangeRequest) returns (RequestEmailChangeResponse);
   rpc RequestAccountDeletion (RequestAccountDeletionRequest) returns (RequestAccountDeletionResponse);
+
+  // Personal Access Tokens (PAT Governance)
+  rpc ListApiTokens (ListApiTokensRequest) returns (ListApiTokensResponse);
+  rpc CreateApiToken (CreateApiTokenRequest) returns (CreateApiTokenResponse);
+  rpc RevokeApiToken (RevokeApiTokenRequest) returns (RevokeApiTokenResponse);
 
   // Organizations
   rpc CreateOrganization (CreateOrganizationRequest) returns (OrganizationResponse);
@@ -185,7 +192,13 @@ service IdentityService {
 message GetMyProfileRequest {}
 
 message UpdateMyProfileRequest {
-  string handle = 1;
+  optional string handle = 1;
+  optional string display_name = 2;
+  optional string first_name = 3;
+  optional string last_name = 4;
+  optional string phone = 5;
+  optional string timezone = 6;
+  optional string locale = 7;
 }
 
 message UserProfileResponse {
@@ -194,6 +207,70 @@ message UserProfileResponse {
   string handle = 3;
   bool email_verified = 4;
   string inserted_at = 5;
+  string display_name = 6;
+  string first_name = 7;
+  string last_name = 8;
+  string phone = 9;
+  string timezone = 10;
+  string locale = 11;
+  optional string pending_email = 12;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse {
+  bool success = 1;
+}
+
+message RequestEmailChangeRequest {
+  string new_email = 1;
+}
+
+message RequestEmailChangeResponse {
+  string pending_email = 1;
+}
+
+message ApiTokenItem {
+  string id = 1;
+  string name = 2;
+  string token_prefix = 3;
+  string scopes = 4;
+  string inserted_at = 5;
+  optional string last_used_at = 6;
+  optional string expires_at = 7;
+  optional string revoked_at = 8;
+}
+
+message ListApiTokensRequest {}
+
+message ListApiTokensResponse {
+  repeated ApiTokenItem tokens = 1;
+}
+
+message CreateApiTokenRequest {
+  string name = 1;
+  int32 expires_in_days = 2;
+  string scopes = 3;
+}
+
+message CreateApiTokenResponse {
+  string id = 1;
+  string name = 2;
+  string plain_token = 3;
+  string token_prefix = 4;
+  string scopes = 5;
+  optional string expires_at = 6;
+}
+
+message RevokeApiTokenRequest {
+  string id = 1;
+}
+
+message RevokeApiTokenResponse {
+  bool success = 1;
 }
 
 message RequestAccountDeletionRequest {}
@@ -288,14 +365,19 @@ message ListMyOrganizationsResponse {
    - `--endpoint`: Überschreibt die Server-Adresse.
 3. **Verbindliche CLI-Befehle (Meilenstein 1):**
    ```bash
-   # Authentifizierung
+   # Authentifizierung & Token-Governance
    faciqor auth login --token <fq_pat_...>
    faciqor auth status
    faciqor auth logout
+   faciqor auth token list
+   faciqor auth token create --name <name> [--expires-in <days>] [--scopes <scopes>]
+   faciqor auth token revoke <token-id>
 
    # Eigenes Benutzerprofil
    faciqor profile show
-   faciqor profile update --handle <new-handle>
+   faciqor profile update [--handle <new-handle>] [--name <display-name>] [--first-name <first>] [--last-name <last>] [--phone <phone>] [--timezone <tz>] [--locale <de|en>]
+   faciqor profile password --current <current-pass> --new <new-pass>
+   faciqor profile email-change --new-email <new-email>
    faciqor profile delete [--yes]
 
    # Organisationsverwaltung
@@ -335,6 +417,7 @@ Alle Ansichten in `backend/lib/faciqor_web/` müssen zwingend die Vorgaben aus `
 2. **Multi-Tenant-Switcher (Sidebar / Header):**
    - Zeigt die aktuell ausgewählte Organisation (`@org-handle` in `fq-mono` + Rollen-Badge `Owner`, `Member` oder `Guest`)[cite: 12].
    - Ein Klick öffnet das Dropdown zum schnellen Wechsel zwischen allen Organisationen des Nutzers (M:N) sowie die Aktion *"+ Neue Organisation gründen"*.
+   - **Benutzerprofil-Avatar:** Zeigt visuell Initialen des Benutzers mit Direktlink zu `/settings/profile`.
 3. **Geführter Empty State (wenn der User 0 Organisationen angehört):**
    - Besitzt der Nutzer nach dem Login noch keine `OrganizationMembership`, zeigt `/dashboard` keine leeren ERP-Menüs, sondern ein fokussiertes Onboarding-Grid mit zwei Karten:
      - **Karte 1 (Primär): „Erste Organisation gründen“** – Öffnet direkt den Erstellungs-Dialog.
@@ -342,20 +425,31 @@ Alle Ansichten in `backend/lib/faciqor_web/` müssen zwingend die Vorgaben aus `
 4. **Wiederherstellungs-Ansicht bei aktivem Soft-Delete (`/account/restore`):**
    - Loggt sich ein Nutzer ein, dessen `deleted_at` gesetzt ist, blockiert ein LiveView `on_mount`-Hook alle regulären Ansichten und zeigt ausschließlich die Wiederherstellungs-Maske mit dem genauen Löschdatum (`purge_at`) und dem Button *"Konto & zugehörige Organisationen jetzt wiederherstellen"*.
 
-### 6.4 Benutzerprofil, API-Tokens & Konto-Löschung (`/settings/profile`)
-Die Seite gliedert sich in drei vertikal gestapelte Karten (`space-6` / `24px` Abstand)[cite: 12]:
-1. **Karte 1 – Benutzerprofil (`User`):**
-   - `Handle`: `<.input monospace={true} />` mit vorangestelltem `@`-Präfix und Live-Validierung (`phx-change="validate_profile"`, `phx-debounce="300"`)[cite: 12]. Prüft Format und Eindeutigkeit in Echtzeit.
-   - `E-Mail-Adresse`: `<.input readonly={true} />` im GoBD-Readonly-Stil inklusive Status-Badge (`Verifiziert` in Grün `#065F46` / `#D1FAE5` oder `Unbestätigt` in Gelb `#92400E` / `#FFFBEB`)[cite: 12].
-2. **Karte 2 – Personal Access Tokens (Go-CLI & gRPC):**
-   - Listet alle aktiven `ApiToken` des Nutzers (`Bezeichnung`, `Erstellt am`, `Zuletzt genutzt`, Button `Widerrufen`).
-   - **Sicherheits-Sperre im UI:** Ist `email_confirmed_at == nil`, ist der Button *"Neues CLI-Token erstellen"* deaktiviert (`disabled`) und mit dem Hinweis versehen: *"Verifizieren Sie zuerst Ihre E-Mail-Adresse, um den CLI-Zugang freizuschalten."*[cite: 12]
-   - Nach Erstellung eines neuen Tokens wird der Klartext-Token einmalig in einem `fq-mono`-Feld mit Copy-Button und dem fertigen Login-Befehl `faciqor auth login --token fq_pat_...` angezeigt[cite: 12].
-3. **Karte 3 – Gefahrenzone (Konto löschen / 60-Tage-Soft-Delete):**
-   - Rahmen in `--fq-status-danger` (`#EF4444`)[cite: 12].
-   - **Dynamische Kaskadierungs-Warnung:** Das System lädt vorab alle Organisationen, in denen der Nutzer der **einzige/letzte aktive `:owner`** ist, und listet deren `@handles` explizit auf:
-     *"Achtung: Sie sind der letzte Eigentümer der folgenden Organisationen: [@org-a, @org-b]. Diese Organisationen und alle zugehörigen Daten werden nach Ablauf der 60-tägigen Wiederherstellungsfrist ebenfalls unwiderruflich gelöscht."*
-   - Erfordert zur Bestätigung die Eingabe des eigenen `@handle` in ein Bestätigungsfeld, bevor der Button *"Konto zur Löschung vormerken (60 Tage Frist)"* (`variant="danger"`) klickbar wird[cite: 12].
+### 6.4 Umfassende Benutzerprofil-Verwaltung (`/settings/profile`)
+Die Seite gliedert sich in eine modulare 7-Karten-Architektur:
+1. **Karte 1 – Persönliche Stammdaten & Identität:**
+   - `Handle`: `<.input monospace={true} />` mit vorangestelltem `@`-Präfix und Live-Validierung (`phx-change="validate_profile"`, `phx-debounce="300"`). Prüft Format und Eindeutigkeit in Echtzeit.
+   - `Anzeigename` (`display_name`), `Vorname` (`first_name`), `Nachname` (`last_name`), `Telefon / Mobilfunk` (`phone`).
+   - `Zeitzone` (`timezone`, z. B. `Europe/Berlin`) & `Sprache` (`locale`, z. B. `de` / `en`).
+2. **Karte 2 – Primäre E-Mail & Verifizierung:**
+   - `E-Mail-Adresse`: Readonly-Anzeige mit Verifizierungs-Badge (`Verifiziert` / `Unbestätigt`).
+   - 2-Schritt-Änderungsprozess: Neuer E-Mail-Vorschlag setzt `pending_email` (gelbes Warn-Banner mit Bestätigungs- und Abbruch-Button). Erst nach Verifizierung wird die primäre Adresse überschrieben.
+3. **Karte 3 – Sicherheit & Kennwort:**
+   - Kennwort ändern (Verifikation des alten Kennworts, Mindestlänge 8 Zeichen, Bestätigungsfeld).
+   - Bei Accounts, die ursprünglich via Magic Link oder Google OAuth registriert wurden: Initiales Kennwort vergeben.
+4. **Karte 4 – Verknüpfte Anmeldeverfahren (SSO):**
+   - Übersicht der verknüpften Identitäten (z. B. Google Workspace / OAuth2).
+5. **Karte 5 – Personal Access Tokens (Go-CLI & gRPC):**
+   - Listet alle `ApiToken` des Nutzers (`Bezeichnung`, `Prefix`, `Berechtigung`, `Erstellt am`, `Gültigkeit`, `Zuletzt genutzt`, Button `Widerrufen`).
+   - Token-Erstellung mit Name, Scopes (`all`, `read_only`, `cli`) und Ablaufzeitraum (30/90/180/365 Tage oder unbegrenzt).
+   - Sicherheits-Gate: Deaktiviert, solange `email_confirmed_at == nil`.
+   - Einmalige Klartext-Anzeige mit Clipboard-Copy und fertigem `faciqor auth login --token <token>` Kommando.
+6. **Karte 6 – Zugehörige Organisationen & Rollen:**
+   - Schnelle Übersicht aller Organisationen mit Rolle (`Owner`, `Member`, `Guest`) und Direktverlinkung.
+7. **Karte 7 – Gefahrenzone (Konto löschen / 60-Tage-Soft-Delete):**
+   - Rahmen in `--fq-status-danger` (`#EF4444`).
+   - **Dynamische Kaskadierungs-Warnung:** Listet alle Organisationen, in denen der Nutzer der **letzte aktive `:owner`** ist.
+   - Erfordert zur Bestätigung die Eingabe des eigenen `@handle` in ein Bestätigungsfeld, bevor die Löschung zur Vormerkung ausgeführt wird.
 
 ### 6.5 Organisationsverwaltung & Stammdaten (`/orgs/new` & `/orgs/:handle/settings`)
 1. **Anlagedialog (`/orgs/new`):**

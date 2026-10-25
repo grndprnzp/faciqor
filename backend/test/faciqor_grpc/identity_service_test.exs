@@ -51,6 +51,60 @@ defmodule FaciqorGrpc.IdentityServiceTest do
 
       assert org_res.handle == "meine-hv"
       assert org_res.my_role == :MEMBERSHIP_ROLE_OWNER
+
+      # Profile update with display name, names, timezone, locale
+      updated_profile =
+        IdentityService.update_my_profile(
+          %V1.UpdateMyProfileRequest{
+            display_name: "Max Mustermann",
+            first_name: "Max",
+            last_name: "Mustermann",
+            phone: "+49 170 1234567",
+            timezone: "Europe/Berlin",
+            locale: "de"
+          },
+          nil
+        )
+
+      assert updated_profile.display_name == "Max Mustermann"
+      assert updated_profile.first_name == "Max"
+      assert updated_profile.last_name == "Mustermann"
+      assert updated_profile.phone == "+49 170 1234567"
+      assert updated_profile.timezone == "Europe/Berlin"
+      assert updated_profile.locale == "de"
+
+      # Request email change
+      email_res =
+        IdentityService.request_email_change(
+          %V1.RequestEmailChangeRequest{new_email: "max.neu@example.com"},
+          nil
+        )
+
+      assert email_res.pending_email == "max.neu@example.com"
+
+      # Create API token via gRPC
+      token_res =
+        IdentityService.create_api_token(
+          %V1.CreateApiTokenRequest{name: "CLI Server", expires_in_days: 90, scopes: "all"},
+          nil
+        )
+
+      assert token_res.token.name == "CLI Server"
+      assert String.starts_with?(token_res.plain_token, "fq_pat_")
+      assert token_res.token.token_prefix != ""
+
+      # List API tokens via gRPC
+      list_res = IdentityService.list_api_tokens(%V1.ListApiTokensRequest{}, nil)
+      assert length(list_res.tokens) >= 2
+
+      # Revoke API token via gRPC
+      revoke_res =
+        IdentityService.revoke_api_token(
+          %V1.RevokeApiTokenRequest{token_id: token_res.token.id},
+          nil
+        )
+
+      assert revoke_res.success == true
     end
   end
 end

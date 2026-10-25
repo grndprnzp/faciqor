@@ -6,8 +6,6 @@ defmodule FaciqorWeb.CoreComponents do
   """
   use Phoenix.Component
 
-  alias Phoenix.LiveView.JS
-
   @doc """
   Renders a button with Desktop-First height (`h-11 lg:h-9`) and focus ring (`#2563EB`).
   """
@@ -260,6 +258,8 @@ defmodule FaciqorWeb.CoreComponents do
     </div>
     """
   end
+
+  def translate_error(msg) when is_binary(msg), do: msg
 
   def translate_error({msg, opts}) do
     Enum.reduce(opts, msg, fn {key, value}, acc ->

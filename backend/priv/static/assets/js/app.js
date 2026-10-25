@@ -9566,9 +9566,29 @@ removing illegal node: "${("outerHTML" in childNode && childNode.outerHTML || ch
 
   // js/app.js
   var csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content");
+  var Hooks2 = {};
+  Hooks2.CopyToClipboard = {
+    mounted() {
+      this.el.addEventListener("click", () => {
+        let text = this.el.dataset.clipboardText;
+        if (text) {
+          navigator.clipboard.writeText(text).then(() => {
+            let originalHtml = this.el.innerHTML;
+            this.el.innerHTML = "<span>\u2713 Kopiert!</span>";
+            setTimeout(() => {
+              this.el.innerHTML = originalHtml;
+            }, 2e3);
+          }).catch((err) => {
+            console.error("Clipboard copy failed:", err);
+          });
+        }
+      });
+    }
+  };
   var liveSocket = new LiveSocket("/live", Socket, {
     longPollFallbackMs: 2500,
-    params: { _csrf_token: csrfToken }
+    params: { _csrf_token: csrfToken },
+    hooks: Hooks2
   });
   liveSocket.connect();
   window.liveSocket = liveSocket;

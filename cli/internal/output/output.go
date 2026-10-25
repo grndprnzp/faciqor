@@ -17,21 +17,71 @@ func PrintJSON(w io.Writer, data interface{}) error {
 
 func PrintProfile(w io.Writer, profile *v1.UserProfileResponse, asJSON bool) error {
 	if asJSON {
-		return PrintJSON(w, map[string]interface{}{
+		m := map[string]interface{}{
 			"id":             profile.Id,
 			"email":          profile.Email,
 			"handle":         profile.Handle,
+			"display_name":   profile.DisplayName,
+			"first_name":     profile.FirstName,
+			"last_name":      profile.LastName,
+			"phone":          profile.Phone,
+			"timezone":       profile.Timezone,
+			"locale":         profile.Locale,
 			"email_verified": profile.EmailVerified,
 			"inserted_at":    profile.InsertedAt,
-		})
+		}
+		if profile.PendingEmail != nil {
+			m["pending_email"] = *profile.PendingEmail
+		}
+		return PrintJSON(w, m)
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(tw, "ID:\t%s\n", profile.Id)
 	fmt.Fprintf(tw, "HANDLE:\t@%s\n", profile.Handle)
+	if profile.DisplayName != "" {
+		fmt.Fprintf(tw, "DISPLAY NAME:\t%s\n", profile.DisplayName)
+	}
+	if profile.FirstName != "" || profile.LastName != "" {
+		fmt.Fprintf(tw, "NAME:\t%s %s\n", profile.FirstName, profile.LastName)
+	}
 	fmt.Fprintf(tw, "EMAIL:\t%s\n", profile.Email)
+	if profile.PendingEmail != nil && *profile.PendingEmail != "" {
+		fmt.Fprintf(tw, "PENDING EMAIL:\t%s (Wartet auf Bestätigung)\n", *profile.PendingEmail)
+	}
+	if profile.Phone != "" {
+		fmt.Fprintf(tw, "PHONE:\t%s\n", profile.Phone)
+	}
+	fmt.Fprintf(tw, "TIMEZONE:\t%s\n", profile.Timezone)
+	fmt.Fprintf(tw, "LOCALE:\t%s\n", profile.Locale)
 	fmt.Fprintf(tw, "VERIFIED:\t%v\n", profile.EmailVerified)
 	fmt.Fprintf(tw, "CREATED:\t%s\n", profile.InsertedAt)
+	return tw.Flush()
+}
+
+func PrintApiTokens(w io.Writer, tokens []*v1.ApiTokenInfo, asJSON bool) error {
+	if asJSON {
+		return PrintJSON(w, tokens)
+	}
+
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tNAME\tPREFIX\tSCOPES\tCREATED\tEXPIRES\tLAST USED")
+	for _, t := range tokens {
+		expires := "Unbegrenzt"
+		if t.ExpiresAt != nil && *t.ExpiresAt != "" {
+			expires = *t.ExpiresAt
+		}
+		lastUsed := "Nie"
+		if t.LastUsedAt != nil && *t.LastUsedAt != "" {
+			lastUsed = *t.LastUsedAt
+		}
+		statusSuffix := ""
+		if t.RevokedAt != nil && *t.RevokedAt != "" {
+			statusSuffix = " [WIDERRUFEN]"
+		}
+		fmt.Fprintf(tw, "%s\t%s%s\t%s\t%s\t%s\t%s\t%s\n",
+			t.Id, t.Name, statusSuffix, t.TokenPrefix+"****", t.Scopes, t.InsertedAt, expires, lastUsed)
+	}
 	return tw.Flush()
 }
 

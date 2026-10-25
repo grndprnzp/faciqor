@@ -27,7 +27,13 @@ defmodule Faciqor.V1.UpdateMyProfileRequest do
   @moduledoc false
   use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
 
-  field :handle, 1, type: :string
+  field :handle, 1, optional: true, type: :string
+  field :display_name, 2, optional: true, type: :string, json_name: "displayName"
+  field :first_name, 3, optional: true, type: :string, json_name: "firstName"
+  field :last_name, 4, optional: true, type: :string, json_name: "lastName"
+  field :phone, 5, optional: true, type: :string
+  field :timezone, 6, optional: true, type: :string
+  field :locale, 7, optional: true, type: :string
 end
 
 defmodule Faciqor.V1.UserProfileResponse do
@@ -39,6 +45,99 @@ defmodule Faciqor.V1.UserProfileResponse do
   field :handle, 3, type: :string
   field :email_verified, 4, type: :bool, json_name: "emailVerified"
   field :inserted_at, 5, type: :string, json_name: "insertedAt"
+  field :display_name, 6, type: :string, json_name: "displayName"
+  field :first_name, 7, type: :string, json_name: "firstName"
+  field :last_name, 8, type: :string, json_name: "lastName"
+  field :phone, 9, type: :string
+  field :timezone, 10, type: :string
+  field :locale, 11, type: :string
+  field :pending_email, 12, optional: true, type: :string, json_name: "pendingEmail"
+end
+
+defmodule Faciqor.V1.ChangePasswordRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :current_password, 1, type: :string, json_name: "currentPassword"
+  field :new_password, 2, type: :string, json_name: "newPassword"
+end
+
+defmodule Faciqor.V1.ChangePasswordResponse do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :success, 1, type: :bool
+end
+
+defmodule Faciqor.V1.RequestEmailChangeRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :new_email, 1, type: :string, json_name: "newEmail"
+end
+
+defmodule Faciqor.V1.RequestEmailChangeResponse do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :pending_email, 1, type: :string, json_name: "pendingEmail"
+end
+
+defmodule Faciqor.V1.ApiTokenInfo do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :id, 1, type: :string
+  field :name, 2, type: :string
+  field :token_prefix, 3, type: :string, json_name: "tokenPrefix"
+  field :scopes, 4, type: :string
+  field :inserted_at, 5, type: :string, json_name: "insertedAt"
+  field :expires_at, 6, optional: true, type: :string, json_name: "expiresAt"
+  field :last_used_at, 7, optional: true, type: :string, json_name: "lastUsedAt"
+  field :revoked_at, 8, optional: true, type: :string, json_name: "revokedAt"
+end
+
+defmodule Faciqor.V1.ListApiTokensRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+end
+
+defmodule Faciqor.V1.ListApiTokensResponse do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :tokens, 1, repeated: true, type: Faciqor.V1.ApiTokenInfo
+end
+
+defmodule Faciqor.V1.CreateApiTokenRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :name, 1, type: :string
+  field :expires_in_days, 2, optional: true, type: :int32, json_name: "expiresInDays"
+  field :scopes, 3, optional: true, type: :string
+end
+
+defmodule Faciqor.V1.CreateApiTokenResponse do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :token, 1, type: Faciqor.V1.ApiTokenInfo
+  field :plain_token, 2, type: :string, json_name: "plainToken"
+end
+
+defmodule Faciqor.V1.RevokeApiTokenRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :token_id, 1, type: :string, json_name: "tokenId"
+end
+
+defmodule Faciqor.V1.RevokeApiTokenResponse do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :success, 1, type: :bool
 end
 
 defmodule Faciqor.V1.RequestAccountDeletionRequest do
@@ -144,7 +243,12 @@ defmodule Faciqor.V1.IdentityService.Service do
 
   rpc :GetMyProfile, Faciqor.V1.GetMyProfileRequest, Faciqor.V1.UserProfileResponse
   rpc :UpdateMyProfile, Faciqor.V1.UpdateMyProfileRequest, Faciqor.V1.UserProfileResponse
+  rpc :ChangePassword, Faciqor.V1.ChangePasswordRequest, Faciqor.V1.ChangePasswordResponse
+  rpc :RequestEmailChange, Faciqor.V1.RequestEmailChangeRequest, Faciqor.V1.RequestEmailChangeResponse
   rpc :RequestAccountDeletion, Faciqor.V1.RequestAccountDeletionRequest, Faciqor.V1.RequestAccountDeletionResponse
+  rpc :ListApiTokens, Faciqor.V1.ListApiTokensRequest, Faciqor.V1.ListApiTokensResponse
+  rpc :CreateApiToken, Faciqor.V1.CreateApiTokenRequest, Faciqor.V1.CreateApiTokenResponse
+  rpc :RevokeApiToken, Faciqor.V1.RevokeApiTokenRequest, Faciqor.V1.RevokeApiTokenResponse
   rpc :CreateOrganization, Faciqor.V1.CreateOrganizationRequest, Faciqor.V1.OrganizationResponse
   rpc :ListMyOrganizations, Faciqor.V1.ListMyOrganizationsRequest, Faciqor.V1.ListMyOrganizationsResponse
   rpc :GetOrganization, Faciqor.V1.GetOrganizationRequest, Faciqor.V1.OrganizationResponse

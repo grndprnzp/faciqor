@@ -144,8 +144,114 @@ func newAuthCmd(opts *Options) *cobra.Command {
 		},
 	}
 
-	authCmd.AddCommand(loginCmd, statusCmd, logoutCmd)
+	authCmd.AddCommand(loginCmd, statusCmd, logoutCmd, newTokenCmd(opts))
 	return authCmd
+}
+
+func newTokenCmd(opts *Options) *cobra.Command {
+	tokenCmd := &cobra.Command{
+		Use:   "token",
+		Short: "Personal Access Tokens (PAT) verwalten",
+	}
+
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "Alle eigenen Personal Access Tokens auflisten",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			res, err := cli.ListApiTokens(context.Background(), &v1.ListApiTokensRequest{})
+			if err != nil {
+				return err
+			}
+			return output.PrintApiTokens(cmd.OutOrStdout(), res.Tokens, opts.JSONOutput)
+		},
+	}
+
+	var name string
+	var expiresInDays int32
+	var scopes string
+	createCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Neues Personal Access Token erstellen",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			req := &v1.CreateApiTokenRequest{
+				Name: name,
+			}
+			if cmd.Flags().Changed("expires-in-days") {
+				req.ExpiresInDays = &expiresInDays
+			}
+			if cmd.Flags().Changed("scopes") {
+				req.Scopes = &scopes
+			}
+
+			res, err := cli.CreateApiToken(context.Background(), req)
+			if err != nil {
+				return err
+			}
+
+			if opts.JSONOutput {
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]interface{}{
+					"token":       res.Token,
+					"plain_token": res.PlainToken,
+				})
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Token '%s' erfolgreich erstellt:\n", res.Token.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "TOKEN: %s\n", res.PlainToken)
+			fmt.Fprintln(cmd.OutOrStdout(), "Hinweis: Bitte speichern Sie dieses Token jetzt. Es wird nicht erneut angezeigt.")
+			return nil
+		},
+	}
+	createCmd.Flags().StringVar(&name, "name", "", "Bezeichnung des Tokens")
+	createCmd.Flags().Int32Var(&expiresInDays, "expires-in-days", 365, "Gültigkeitsdauer in Tagen (0 für unbegrenzt)")
+	createCmd.Flags().StringVar(&scopes, "scopes", "all", "Berechtigungs-Scopes (z.B. all, read_only, cli)")
+
+	var tokenId string
+	revokeCmd := &cobra.Command{
+		Use:   "revoke",
+		Short: "Personal Access Token widerrufen",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if tokenId == "" {
+				return fmt.Errorf("--id is required")
+			}
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			_, err = cli.RevokeApiToken(context.Background(), &v1.RevokeApiTokenRequest{
+				TokenId: tokenId,
+			})
+			if err != nil {
+				return err
+			}
+
+			if opts.JSONOutput {
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]bool{"revoked": true})
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "Token erfolgreich widerrufen.")
+			return nil
+		},
+	}
+	revokeCmd.Flags().StringVar(&tokenId, "id", "", "ID des zu widerrufenden Tokens")
+
+	tokenCmd.AddCommand(listCmd, createCmd, revokeCmd)
+	return tokenCmd
 }
 
 // --- PROFILE COMMANDS ---
@@ -174,23 +280,55 @@ func newProfileCmd(opts *Options) *cobra.Command {
 		},
 	}
 
-	var handle string
+	var handle, displayName, firstName, lastName, phone, timezone, locale string
 	updateCmd := &cobra.Command{
 		Use:   "update",
-		Short: "Eigenes Handle aktualisieren",
+		Short: "Eigenes Profil aktualisieren",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if handle == "" {
-				return fmt.Errorf("--handle is required")
+			req := &v1.UpdateMyProfileRequest{}
+			hasChanges := false
+
+			if cmd.Flags().Changed("handle") {
+				clean := strings.TrimSpace(strings.TrimPrefix(handle, "@"))
+				req.Handle = &clean
+				hasChanges = true
 			}
+			if cmd.Flags().Changed("display-name") {
+				req.DisplayName = &displayName
+				hasChanges = true
+			}
+			if cmd.Flags().Changed("first-name") {
+				req.FirstName = &firstName
+				hasChanges = true
+			}
+			if cmd.Flags().Changed("last-name") {
+				req.LastName = &lastName
+				hasChanges = true
+			}
+			if cmd.Flags().Changed("phone") {
+				req.Phone = &phone
+				hasChanges = true
+			}
+			if cmd.Flags().Changed("timezone") {
+				req.Timezone = &timezone
+				hasChanges = true
+			}
+			if cmd.Flags().Changed("locale") {
+				req.Locale = &locale
+				hasChanges = true
+			}
+
+			if !hasChanges {
+				return fmt.Errorf("mindestens eine Eigenschaft muss geändert werden (--handle, --display-name, etc.)")
+			}
+
 			cli, closeFn, _, err := resolveClient(opts)
 			if err != nil {
 				return err
 			}
 			defer closeFn()
 
-			profile, err := cli.UpdateMyProfile(context.Background(), &v1.UpdateMyProfileRequest{
-				Handle: handle,
-			})
+			profile, err := cli.UpdateMyProfile(context.Background(), req)
 			if err != nil {
 				return err
 			}
@@ -198,6 +336,74 @@ func newProfileCmd(opts *Options) *cobra.Command {
 		},
 	}
 	updateCmd.Flags().StringVar(&handle, "handle", "", "Neues Benutzer-Handle")
+	updateCmd.Flags().StringVar(&displayName, "display-name", "", "Anzeigename")
+	updateCmd.Flags().StringVar(&firstName, "first-name", "", "Vorname")
+	updateCmd.Flags().StringVar(&lastName, "last-name", "", "Nachname")
+	updateCmd.Flags().StringVar(&phone, "phone", "", "Telefonnummer")
+	updateCmd.Flags().StringVar(&timezone, "timezone", "", "Zeitzone (z. B. Europe/Berlin)")
+	updateCmd.Flags().StringVar(&locale, "locale", "", "Sprachcode (z. B. de oder en)")
+
+	var currentPass, newPass string
+	passwordCmd := &cobra.Command{
+		Use:   "password",
+		Short: "Eigenes Kennwort ändern",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if currentPass == "" || newPass == "" {
+				return fmt.Errorf("--current-password und --new-password sind erforderlich")
+			}
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			_, err = cli.ChangePassword(context.Background(), &v1.ChangePasswordRequest{
+				CurrentPassword: currentPass,
+				NewPassword:     newPass,
+			})
+			if err != nil {
+				return err
+			}
+
+			if opts.JSONOutput {
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]bool{"success": true})
+			}
+			fmt.Fprintln(cmd.OutOrStdout(), "Kennwort erfolgreich geändert.")
+			return nil
+		},
+	}
+	passwordCmd.Flags().StringVar(&currentPass, "current-password", "", "Aktuelles Passwort")
+	passwordCmd.Flags().StringVar(&newPass, "new-password", "", "Neues Passwort (min. 8 Zeichen)")
+
+	var newEmail string
+	emailChangeCmd := &cobra.Command{
+		Use:   "email-change",
+		Short: "Änderung der primären E-Mail-Adresse anfordern",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if newEmail == "" {
+				return fmt.Errorf("--email ist erforderlich")
+			}
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			res, err := cli.RequestEmailChange(context.Background(), &v1.RequestEmailChangeRequest{
+				NewEmail: newEmail,
+			})
+			if err != nil {
+				return err
+			}
+
+			if opts.JSONOutput {
+				return output.PrintJSON(cmd.OutOrStdout(), map[string]string{"pending_email": res.PendingEmail})
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "Bestätigungs-Anfrage an '%s' wurde vorgemerkt.\n", res.PendingEmail)
+			return nil
+		},
+	}
+	emailChangeCmd.Flags().StringVar(&newEmail, "email", "", "Neue E-Mail-Adresse")
 
 	var confirmYes bool
 	deleteCmd := &cobra.Command{
@@ -229,7 +435,7 @@ func newProfileCmd(opts *Options) *cobra.Command {
 	}
 	deleteCmd.Flags().BoolVar(&confirmYes, "yes", false, "Löschung ohne Rückfrage bestätigen")
 
-	profileCmd.AddCommand(showCmd, updateCmd, deleteCmd)
+	profileCmd.AddCommand(showCmd, updateCmd, passwordCmd, emailChangeCmd, deleteCmd)
 	return profileCmd
 }
 

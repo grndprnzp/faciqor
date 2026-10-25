@@ -21,7 +21,12 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	IdentityService_GetMyProfile_FullMethodName           = "/faciqor.v1.IdentityService/GetMyProfile"
 	IdentityService_UpdateMyProfile_FullMethodName        = "/faciqor.v1.IdentityService/UpdateMyProfile"
+	IdentityService_ChangePassword_FullMethodName         = "/faciqor.v1.IdentityService/ChangePassword"
+	IdentityService_RequestEmailChange_FullMethodName     = "/faciqor.v1.IdentityService/RequestEmailChange"
 	IdentityService_RequestAccountDeletion_FullMethodName = "/faciqor.v1.IdentityService/RequestAccountDeletion"
+	IdentityService_ListApiTokens_FullMethodName          = "/faciqor.v1.IdentityService/ListApiTokens"
+	IdentityService_CreateApiToken_FullMethodName         = "/faciqor.v1.IdentityService/CreateApiToken"
+	IdentityService_RevokeApiToken_FullMethodName         = "/faciqor.v1.IdentityService/RevokeApiToken"
 	IdentityService_CreateOrganization_FullMethodName     = "/faciqor.v1.IdentityService/CreateOrganization"
 	IdentityService_ListMyOrganizations_FullMethodName    = "/faciqor.v1.IdentityService/ListMyOrganizations"
 	IdentityService_GetOrganization_FullMethodName        = "/faciqor.v1.IdentityService/GetOrganization"
@@ -36,7 +41,13 @@ type IdentityServiceClient interface {
 	// User Profile
 	GetMyProfile(ctx context.Context, in *GetMyProfileRequest, opts ...grpc.CallOption) (*UserProfileResponse, error)
 	UpdateMyProfile(ctx context.Context, in *UpdateMyProfileRequest, opts ...grpc.CallOption) (*UserProfileResponse, error)
+	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error)
+	RequestEmailChange(ctx context.Context, in *RequestEmailChangeRequest, opts ...grpc.CallOption) (*RequestEmailChangeResponse, error)
 	RequestAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error)
+	// Personal Access Tokens
+	ListApiTokens(ctx context.Context, in *ListApiTokensRequest, opts ...grpc.CallOption) (*ListApiTokensResponse, error)
+	CreateApiToken(ctx context.Context, in *CreateApiTokenRequest, opts ...grpc.CallOption) (*CreateApiTokenResponse, error)
+	RevokeApiToken(ctx context.Context, in *RevokeApiTokenRequest, opts ...grpc.CallOption) (*RevokeApiTokenResponse, error)
 	// Organizations
 	CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*OrganizationResponse, error)
 	ListMyOrganizations(ctx context.Context, in *ListMyOrganizationsRequest, opts ...grpc.CallOption) (*ListMyOrganizationsResponse, error)
@@ -71,9 +82,54 @@ func (c *identityServiceClient) UpdateMyProfile(ctx context.Context, in *UpdateM
 	return out, nil
 }
 
+func (c *identityServiceClient) ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error) {
+	out := new(ChangePasswordResponse)
+	err := c.cc.Invoke(ctx, IdentityService_ChangePassword_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RequestEmailChange(ctx context.Context, in *RequestEmailChangeRequest, opts ...grpc.CallOption) (*RequestEmailChangeResponse, error) {
+	out := new(RequestEmailChangeResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RequestEmailChange_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *identityServiceClient) RequestAccountDeletion(ctx context.Context, in *RequestAccountDeletionRequest, opts ...grpc.CallOption) (*RequestAccountDeletionResponse, error) {
 	out := new(RequestAccountDeletionResponse)
 	err := c.cc.Invoke(ctx, IdentityService_RequestAccountDeletion_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) ListApiTokens(ctx context.Context, in *ListApiTokensRequest, opts ...grpc.CallOption) (*ListApiTokensResponse, error) {
+	out := new(ListApiTokensResponse)
+	err := c.cc.Invoke(ctx, IdentityService_ListApiTokens_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) CreateApiToken(ctx context.Context, in *CreateApiTokenRequest, opts ...grpc.CallOption) (*CreateApiTokenResponse, error) {
+	out := new(CreateApiTokenResponse)
+	err := c.cc.Invoke(ctx, IdentityService_CreateApiToken_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RevokeApiToken(ctx context.Context, in *RevokeApiTokenRequest, opts ...grpc.CallOption) (*RevokeApiTokenResponse, error) {
+	out := new(RevokeApiTokenResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RevokeApiToken_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +188,13 @@ type IdentityServiceServer interface {
 	// User Profile
 	GetMyProfile(context.Context, *GetMyProfileRequest) (*UserProfileResponse, error)
 	UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UserProfileResponse, error)
+	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error)
+	RequestEmailChange(context.Context, *RequestEmailChangeRequest) (*RequestEmailChangeResponse, error)
 	RequestAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error)
+	// Personal Access Tokens
+	ListApiTokens(context.Context, *ListApiTokensRequest) (*ListApiTokensResponse, error)
+	CreateApiToken(context.Context, *CreateApiTokenRequest) (*CreateApiTokenResponse, error)
+	RevokeApiToken(context.Context, *RevokeApiTokenRequest) (*RevokeApiTokenResponse, error)
 	// Organizations
 	CreateOrganization(context.Context, *CreateOrganizationRequest) (*OrganizationResponse, error)
 	ListMyOrganizations(context.Context, *ListMyOrganizationsRequest) (*ListMyOrganizationsResponse, error)
@@ -152,8 +214,23 @@ func (UnimplementedIdentityServiceServer) GetMyProfile(context.Context, *GetMyPr
 func (UnimplementedIdentityServiceServer) UpdateMyProfile(context.Context, *UpdateMyProfileRequest) (*UserProfileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateMyProfile not implemented")
 }
+func (UnimplementedIdentityServiceServer) ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangePassword not implemented")
+}
+func (UnimplementedIdentityServiceServer) RequestEmailChange(context.Context, *RequestEmailChangeRequest) (*RequestEmailChangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RequestEmailChange not implemented")
+}
 func (UnimplementedIdentityServiceServer) RequestAccountDeletion(context.Context, *RequestAccountDeletionRequest) (*RequestAccountDeletionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestAccountDeletion not implemented")
+}
+func (UnimplementedIdentityServiceServer) ListApiTokens(context.Context, *ListApiTokensRequest) (*ListApiTokensResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListApiTokens not implemented")
+}
+func (UnimplementedIdentityServiceServer) CreateApiToken(context.Context, *CreateApiTokenRequest) (*CreateApiTokenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateApiToken not implemented")
+}
+func (UnimplementedIdentityServiceServer) RevokeApiToken(context.Context, *RevokeApiTokenRequest) (*RevokeApiTokenResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RevokeApiToken not implemented")
 }
 func (UnimplementedIdentityServiceServer) CreateOrganization(context.Context, *CreateOrganizationRequest) (*OrganizationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateOrganization not implemented")
@@ -219,6 +296,42 @@ func _IdentityService_UpdateMyProfile_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_ChangePassword_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChangePasswordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).ChangePassword(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_ChangePassword_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).ChangePassword(ctx, req.(*ChangePasswordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RequestEmailChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestEmailChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RequestEmailChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RequestEmailChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RequestEmailChange(ctx, req.(*RequestEmailChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IdentityService_RequestAccountDeletion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequestAccountDeletionRequest)
 	if err := dec(in); err != nil {
@@ -233,6 +346,60 @@ func _IdentityService_RequestAccountDeletion_Handler(srv interface{}, ctx contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IdentityServiceServer).RequestAccountDeletion(ctx, req.(*RequestAccountDeletionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_ListApiTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListApiTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).ListApiTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_ListApiTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).ListApiTokens(ctx, req.(*ListApiTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_CreateApiToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateApiTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).CreateApiToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_CreateApiToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).CreateApiToken(ctx, req.(*CreateApiTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RevokeApiToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeApiTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RevokeApiToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RevokeApiToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RevokeApiToken(ctx, req.(*RevokeApiTokenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -343,8 +510,28 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _IdentityService_UpdateMyProfile_Handler,
 		},
 		{
+			MethodName: "ChangePassword",
+			Handler:    _IdentityService_ChangePassword_Handler,
+		},
+		{
+			MethodName: "RequestEmailChange",
+			Handler:    _IdentityService_RequestEmailChange_Handler,
+		},
+		{
 			MethodName: "RequestAccountDeletion",
 			Handler:    _IdentityService_RequestAccountDeletion_Handler,
+		},
+		{
+			MethodName: "ListApiTokens",
+			Handler:    _IdentityService_ListApiTokens_Handler,
+		},
+		{
+			MethodName: "CreateApiToken",
+			Handler:    _IdentityService_CreateApiToken_Handler,
+		},
+		{
+			MethodName: "RevokeApiToken",
+			Handler:    _IdentityService_RevokeApiToken_Handler,
 		},
 		{
 			MethodName: "CreateOrganization",

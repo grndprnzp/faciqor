@@ -55,8 +55,83 @@ func (m *mockIdentityClient) UpdateMyProfile(ctx context.Context, in *v1.UpdateM
 	if err := m.checkGate(); err != nil {
 		return nil, err
 	}
-	m.profile.Handle = in.Handle
+	if in.Handle != nil {
+		m.profile.Handle = *in.Handle
+	}
+	if in.DisplayName != nil {
+		m.profile.DisplayName = *in.DisplayName
+	}
+	if in.FirstName != nil {
+		m.profile.FirstName = *in.FirstName
+	}
+	if in.LastName != nil {
+		m.profile.LastName = *in.LastName
+	}
+	if in.Phone != nil {
+		m.profile.Phone = *in.Phone
+	}
+	if in.Timezone != nil {
+		m.profile.Timezone = *in.Timezone
+	}
+	if in.Locale != nil {
+		m.profile.Locale = *in.Locale
+	}
 	return m.profile, nil
+}
+
+func (m *mockIdentityClient) ChangePassword(ctx context.Context, in *v1.ChangePasswordRequest, opts ...grpc.CallOption) (*v1.ChangePasswordResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	return &v1.ChangePasswordResponse{Success: true}, nil
+}
+
+func (m *mockIdentityClient) RequestEmailChange(ctx context.Context, in *v1.RequestEmailChangeRequest, opts ...grpc.CallOption) (*v1.RequestEmailChangeResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	m.profile.PendingEmail = &in.NewEmail
+	return &v1.RequestEmailChangeResponse{PendingEmail: in.NewEmail}, nil
+}
+
+func (m *mockIdentityClient) ListApiTokens(ctx context.Context, in *v1.ListApiTokensRequest, opts ...grpc.CallOption) (*v1.ListApiTokensResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	tokens := []*v1.ApiTokenInfo{
+		{
+			Id:          "token-uuid-1",
+			Name:        "Laptop CLI",
+			TokenPrefix: "fq_pat_test",
+			Scopes:      "all",
+			InsertedAt:  "2026-10-25T08:00:00Z",
+		},
+	}
+	return &v1.ListApiTokensResponse{Tokens: tokens}, nil
+}
+
+func (m *mockIdentityClient) CreateApiToken(ctx context.Context, in *v1.CreateApiTokenRequest, opts ...grpc.CallOption) (*v1.CreateApiTokenResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	tok := &v1.ApiTokenInfo{
+		Id:          "token-uuid-created",
+		Name:        in.Name,
+		TokenPrefix: "fq_pat_new1",
+		Scopes:      "all",
+		InsertedAt:  "2026-10-25T08:00:00Z",
+	}
+	return &v1.CreateApiTokenResponse{
+		Token:      tok,
+		PlainToken: "fq_pat_new123456789",
+	}, nil
+}
+
+func (m *mockIdentityClient) RevokeApiToken(ctx context.Context, in *v1.RevokeApiTokenRequest, opts ...grpc.CallOption) (*v1.RevokeApiTokenResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	return &v1.RevokeApiTokenResponse{Success: true}, nil
 }
 
 func (m *mockIdentityClient) RequestAccountDeletion(ctx context.Context, in *v1.RequestAccountDeletionRequest, opts ...grpc.CallOption) (*v1.RequestAccountDeletionResponse, error) {
@@ -231,5 +306,75 @@ func TestFullVerifiedCLIWorkflow(t *testing.T) {
 	}
 	if parsed[0]["my_role"] != "MEMBERSHIP_ROLE_OWNER" {
 		t.Errorf("expected my_role 'MEMBERSHIP_ROLE_OWNER', got %v", parsed[0]["my_role"])
+	}
+}
+
+func TestProfileAndTokenCommands(t *testing.T) {
+	mock := newMockClient(false)
+	tmpConfig := filepath.Join(t.TempDir(), "config.yaml")
+
+	// 1. faciqor profile update with new fields
+	out, err := runCLI(t, mock, tmpConfig, "profile", "update",
+		"--handle", "@max_dev",
+		"--display-name", "Max Mustermann",
+		"--first-name", "Max",
+		"--last-name", "Mustermann",
+		"--phone", "+49 170 1234567",
+		"--timezone", "Europe/Berlin",
+		"--locale", "de",
+	)
+	if err != nil {
+		t.Fatalf("profile update failed: %v", err)
+	}
+	if !strings.Contains(out, "Max Mustermann") {
+		t.Errorf("expected updated display name in output, got: %s", out)
+	}
+	if mock.profile.Handle != "max_dev" {
+		t.Errorf("expected normalized handle 'max_dev', got: %s", mock.profile.Handle)
+	}
+
+	// 2. faciqor profile password
+	out, err = runCLI(t, mock, tmpConfig, "profile", "password", "--current-password", "oldpass123", "--new-password", "newsecret123")
+	if err != nil {
+		t.Fatalf("profile password failed: %v", err)
+	}
+	if !strings.Contains(out, "erfolgreich geändert") {
+		t.Errorf("expected success message in output, got: %s", out)
+	}
+
+	// 3. faciqor profile email-change
+	out, err = runCLI(t, mock, tmpConfig, "profile", "email-change", "--email", "new@example.com")
+	if err != nil {
+		t.Fatalf("profile email-change failed: %v", err)
+	}
+	if !strings.Contains(out, "new@example.com") {
+		t.Errorf("expected pending email in output, got: %s", out)
+	}
+
+	// 4. faciqor auth token list
+	out, err = runCLI(t, mock, tmpConfig, "auth", "token", "list")
+	if err != nil {
+		t.Fatalf("auth token list failed: %v", err)
+	}
+	if !strings.Contains(out, "Laptop CLI") {
+		t.Errorf("expected 'Laptop CLI' in token list, got: %s", out)
+	}
+
+	// 5. faciqor auth token create
+	out, err = runCLI(t, mock, tmpConfig, "auth", "token", "create", "--name", "New Workstation", "--expires-in-days", "90")
+	if err != nil {
+		t.Fatalf("auth token create failed: %v", err)
+	}
+	if !strings.Contains(out, "fq_pat_new123456789") {
+		t.Errorf("expected plain token in output, got: %s", out)
+	}
+
+	// 6. faciqor auth token revoke
+	out, err = runCLI(t, mock, tmpConfig, "auth", "token", "revoke", "--id", "token-uuid-1")
+	if err != nil {
+		t.Fatalf("auth token revoke failed: %v", err)
+	}
+	if !strings.Contains(out, "erfolgreich widerrufen") {
+		t.Errorf("expected success message in output, got: %s", out)
 	}
 }

@@ -6,6 +6,8 @@ defmodule Faciqor.Accounts.User do
     authorizers: [Ash.Policy.Authorizer],
     extensions: [AshAuthentication]
 
+  require Ash.Query
+
   postgres do
     table "users"
     repo Faciqor.Repo
@@ -119,6 +121,38 @@ defmodule Faciqor.Accounts.User do
       public? true
     end
 
+    attribute :display_name, :string do
+      public? true
+    end
+
+    attribute :first_name, :string do
+      public? true
+    end
+
+    attribute :last_name, :string do
+      public? true
+    end
+
+    attribute :phone, :string do
+      public? true
+    end
+
+    attribute :timezone, :string do
+      allow_nil? false
+      default "Europe/Berlin"
+      public? true
+    end
+
+    attribute :locale, :string do
+      allow_nil? false
+      default "de"
+      public? true
+    end
+
+    attribute :pending_email, :ci_string do
+      public? true
+    end
+
     create_timestamp :inserted_at
     update_timestamp :updated_at
   end
@@ -205,8 +239,168 @@ defmodule Faciqor.Accounts.User do
     end
 
     update :update_profile do
-      accept [:handle]
+      accept [:handle, :display_name, :first_name, :last_name, :phone, :timezone, :locale]
       require_atomic? false
+    end
+
+    update :change_password do
+      require_atomic? false
+      argument :current_password, :string, allow_nil?: false, sensitive?: true
+      argument :password, :string, allow_nil?: false, sensitive?: true
+      argument :password_confirmation, :string, allow_nil?: false, sensitive?: true
+
+      validate fn changeset, _context ->
+        current = Ash.Changeset.get_argument(changeset, :current_password)
+        stored = changeset.data.hashed_password
+
+        cond do
+          is_nil(current) ->
+            :ok
+
+          is_binary(current) and is_binary(stored) and Bcrypt.verify_pass(current, stored) ->
+            :ok
+
+          true ->
+            {:error, field: :current_password, message: "Das aktuelle Passwort ist nicht korrekt."}
+        end
+      end
+
+      validate fn changeset, _context ->
+        pass = Ash.Changeset.get_argument(changeset, :password)
+        conf = Ash.Changeset.get_argument(changeset, :password_confirmation)
+
+        cond do
+          is_nil(pass) and is_nil(conf) ->
+            :ok
+
+          is_nil(pass) or String.length(pass) < 8 ->
+            {:error, field: :password, message: "Das neue Passwort muss mindestens 8 Zeichen lang sein."}
+
+          pass != conf ->
+            {:error, field: :password_confirmation, message: "Passwörter stimmen nicht überein."}
+
+          true ->
+            :ok
+        end
+      end
+
+      change fn changeset, _context ->
+        pass = Ash.Changeset.get_argument(changeset, :password)
+
+        if is_binary(pass) do
+          Ash.Changeset.change_attribute(changeset, :hashed_password, Bcrypt.hash_pwd_salt(pass))
+        else
+          changeset
+        end
+      end
+    end
+
+    update :set_initial_password do
+      require_atomic? false
+      argument :password, :string, allow_nil?: false, sensitive?: true
+      argument :password_confirmation, :string, allow_nil?: false, sensitive?: true
+
+      validate fn changeset, _context ->
+        if is_nil(changeset.data.hashed_password) do
+          :ok
+        else
+          {:error, field: :password, message: "Bereits ein Kennwort vergeben. Bitte nutzen Sie 'Passwort ändern'."}
+        end
+      end
+
+      validate fn changeset, _context ->
+        pass = Ash.Changeset.get_argument(changeset, :password)
+        conf = Ash.Changeset.get_argument(changeset, :password_confirmation)
+
+        cond do
+          is_nil(pass) and is_nil(conf) ->
+            :ok
+
+          is_nil(pass) or String.length(pass) < 8 ->
+            {:error, field: :password, message: "Das neue Passwort muss mindestens 8 Zeichen lang sein."}
+
+          pass != conf ->
+            {:error, field: :password_confirmation, message: "Passwörter stimmen nicht überein."}
+
+          true ->
+            :ok
+        end
+      end
+
+      change fn changeset, _context ->
+        pass = Ash.Changeset.get_argument(changeset, :password)
+
+        if is_binary(pass) do
+          Ash.Changeset.change_attribute(changeset, :hashed_password, Bcrypt.hash_pwd_salt(pass))
+        else
+          changeset
+        end
+      end
+    end
+
+    update :request_email_change do
+      require_atomic? false
+      argument :new_email, :ci_string, allow_nil?: false
+
+      validate fn changeset, _context ->
+        raw = Ash.Changeset.get_argument(changeset, :new_email)
+
+        if is_nil(raw) do
+          :ok
+        else
+          new_email = raw |> to_string() |> String.trim()
+          current_email = to_string(changeset.data.email)
+
+          cond do
+            new_email == "" or not String.contains?(new_email, "@") ->
+              {:error, field: :new_email, message: "Bitte geben Sie eine gültige E-Mail-Adresse an."}
+
+            String.downcase(new_email) == String.downcase(current_email) ->
+              {:error, field: :new_email, message: "Die neue E-Mail-Adresse muss sich von der aktuellen unterscheiden."}
+
+            true ->
+              current_id = changeset.data.id
+
+              case Faciqor.Accounts.User
+                   |> Ash.Query.filter(email == ^new_email and id != ^current_id)
+                   |> Ash.read(authorize?: false) do
+                {:ok, []} -> :ok
+                _ -> {:error, field: :new_email, message: "Diese E-Mail-Adresse ist bereits vergeben."}
+              end
+          end
+        end
+      end
+
+      change fn changeset, _context ->
+        new_email = Ash.Changeset.get_argument(changeset, :new_email) |> to_string() |> String.trim()
+        Ash.Changeset.change_attribute(changeset, :pending_email, new_email)
+      end
+    end
+
+    update :confirm_email_change do
+      require_atomic? false
+
+      validate fn changeset, _context ->
+        if is_nil(changeset.data.pending_email) do
+          {:error, field: :pending_email, message: "Keine ausstehende E-Mail-Änderung vorhanden."}
+        else
+          :ok
+        end
+      end
+
+      change fn changeset, _context ->
+        new_email = changeset.data.pending_email
+
+        changeset
+        |> Ash.Changeset.change_attribute(:email, new_email)
+        |> Ash.Changeset.change_attribute(:pending_email, nil)
+        |> Ash.Changeset.change_attribute(:email_confirmed_at, DateTime.utc_now())
+      end
+    end
+
+    update :cancel_email_change do
+      require_atomic? false
+      change set_attribute(:pending_email, nil)
     end
 
     update :confirm_email do

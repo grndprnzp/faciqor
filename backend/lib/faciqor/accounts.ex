@@ -30,7 +30,25 @@ defmodule Faciqor.Accounts do
   """
   def create_personal_access_token(name, opts \\ []) do
     actor = Keyword.fetch!(opts, :actor)
-    expires_at = Keyword.get(opts, :expires_at, DateTime.add(DateTime.utc_now(), 365 * 86400, :second))
+    scopes = Keyword.get(opts, :scopes, "all")
+
+    expires_at =
+      cond do
+        Keyword.has_key?(opts, :expires_at) ->
+          Keyword.get(opts, :expires_at)
+
+        Keyword.has_key?(opts, :expires_in_days) ->
+          case Keyword.get(opts, :expires_in_days) do
+            days when is_integer(days) and days > 0 ->
+              DateTime.add(DateTime.utc_now(), days * 86400, :second)
+
+            _ ->
+              nil
+          end
+
+        true ->
+          DateTime.add(DateTime.utc_now(), 365 * 86400, :second)
+      end
 
     plain_token = "fq_pat_" <> (:crypto.strong_rand_bytes(24) |> Base.url_encode64(padding: false))
 
@@ -38,6 +56,7 @@ defmodule Faciqor.Accounts do
     |> Ash.Changeset.for_create(:generate, %{
       name: name,
       expires_at: expires_at,
+      scopes: scopes,
       token_plain: plain_token
     }, actor: actor)
     |> Ash.create(actor: actor)

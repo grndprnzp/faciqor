@@ -54,7 +54,21 @@ defmodule Faciqor.Accounts.ApiToken do
       public? true
     end
 
+    attribute :token_prefix, :string do
+      public? true
+    end
+
+    attribute :scopes, :string do
+      default "all"
+      public? true
+    end
+
     create_timestamp :inserted_at
+  end
+
+  calculations do
+    calculate :is_expired?, :boolean, expr(not is_nil(expires_at) and expires_at < now())
+    calculate :is_active?, :boolean, expr(is_nil(revoked_at) and (is_nil(expires_at) or expires_at >= now()))
   end
 
   relationships do
@@ -68,7 +82,7 @@ defmodule Faciqor.Accounts.ApiToken do
     defaults [:read, :destroy]
 
     create :generate do
-      accept [:name, :expires_at]
+      accept [:name, :expires_at, :scopes]
       argument :token_plain, :string, allow_nil?: false, sensitive?: true
 
       change relate_actor(:user)
@@ -76,7 +90,11 @@ defmodule Faciqor.Accounts.ApiToken do
       change fn changeset, _context ->
         plain = Ash.Changeset.get_argument(changeset, :token_plain)
         hash = :crypto.hash(:sha256, plain) |> Base.encode16(case: :lower)
-        Ash.Changeset.change_attribute(changeset, :token_hash, hash)
+        prefix = String.slice(plain, 0, 14)
+
+        changeset
+        |> Ash.Changeset.change_attribute(:token_hash, hash)
+        |> Ash.Changeset.change_attribute(:token_prefix, prefix)
       end
     end
 
