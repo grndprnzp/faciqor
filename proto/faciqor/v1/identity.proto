@@ -36,6 +36,14 @@ service IdentityService {
   rpc GetOrganization (GetOrganizationRequest) returns (OrganizationResponse);
   rpc UpdateOrganization (UpdateOrganizationRequest) returns (OrganizationResponse);
   rpc SoftDeleteOrganization (SoftDeleteOrganizationRequest) returns (OrganizationResponse);
+
+  // Avatar & Organization Logo Uploads
+  rpc GetAvatarUploadTicket (GetAvatarUploadTicketRequest) returns (UploadTicketResponse);
+  rpc SetAvatar (SetAvatarRequest) returns (UserProfileResponse);
+  rpc RemoveAvatar (RemoveAvatarRequest) returns (UserProfileResponse);
+  rpc GetOrganizationLogoUploadTicket (GetOrganizationLogoUploadTicketRequest) returns (UploadTicketResponse);
+  rpc SetOrganizationLogo (SetOrganizationLogoRequest) returns (OrganizationResponse);
+  rpc RemoveOrganizationLogo (RemoveOrganizationLogoRequest) returns (OrganizationResponse);
 }
 
 message GetMyProfileRequest {}
@@ -63,6 +71,8 @@ message UserProfileResponse {
   string timezone = 10;
   string locale = 11;
   optional string pending_email = 12;
+  optional string avatar_url = 13;
+  optional MediaVariants avatar_variants = 14;
 }
 
 message ChangePasswordRequest {
@@ -180,6 +190,8 @@ message OrganizationResponse {
   string vat_id = 13;
   string contact_email = 14;
   optional string deleted_at = 15;
+  optional string logo_url = 16;
+  optional MediaVariants logo_variants = 17;
 }
 
 message ListMyOrganizationsRequest {}
@@ -187,3 +199,46 @@ message ListMyOrganizationsRequest {}
 message ListMyOrganizationsResponse {
   repeated OrganizationResponse organizations = 1;
 }
+
+message MediaVariants {
+  optional string size_64 = 1;
+  optional string size_128 = 2;
+  optional string size_256 = 3;
+  optional string size_512 = 4;
+}
+
+message GetAvatarUploadTicketRequest {
+  string content_type = 1;
+  int64 byte_size = 2;
+  string sha256 = 3;
+}
+
+message GetOrganizationLogoUploadTicketRequest {
+  string id_or_handle = 1;
+  string content_type = 2;
+  int64 byte_size = 3;
+  string sha256 = 4;
+}
+
+message UploadTicketResponse {
+  string blob_id = 1;
+  string upload_url = 2;
+  string storage_key = 3;
+  map<string, string> headers = 4;
+}
+
+message SetAvatarRequest {
+  string blob_id = 1;
+}
+
+message RemoveAvatarRequest {}
+
+message SetOrganizationLogoRequest {
+  string id_or_handle = 1;
+  string blob_id = 2;
+}
+
+message RemoveOrganizationLogoRequest {
+  string id_or_handle = 1;
+}
+

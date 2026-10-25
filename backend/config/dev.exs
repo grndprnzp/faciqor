@@ -28,6 +28,16 @@ config :faciqor, FaciqorWeb.Endpoint,
 
 config :faciqor, :token_signing_secret, "dev_token_signing_secret_at_least_32_bytes_long_1234567890"
 
+config :ex_aws,
+  access_key_id: "any",
+  secret_access_key: "any",
+  region: "us-east-1"
+
+config :ex_aws, :s3,
+  scheme: "http://",
+  host: "localhost",
+  port: 8333
+
 config :logger, :console, format: "[$level] $message\n"
 config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime

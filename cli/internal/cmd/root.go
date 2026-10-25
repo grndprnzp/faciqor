@@ -7,6 +7,7 @@ import (
 
 	"faciqor/internal/client"
 	"faciqor/internal/config"
+	"faciqor/internal/media"
 	"faciqor/internal/output"
 	v1 "faciqor/pkg/api/v1"
 
@@ -435,7 +436,75 @@ func newProfileCmd(opts *Options) *cobra.Command {
 	}
 	deleteCmd.Flags().BoolVar(&confirmYes, "yes", false, "Löschung ohne Rückfrage bestätigen")
 
-	profileCmd.AddCommand(showCmd, updateCmd, passwordCmd, emailChangeCmd, deleteCmd)
+	avatarCmd := &cobra.Command{
+		Use:   "avatar",
+		Short: "Eigenes Avatar-Bild verwalten",
+	}
+
+	avatarSetCmd := &cobra.Command{
+		Use:   "set <filepath>",
+		Short: "Eigenes Avatar-Bild hochladen (1:1 quadratisch, min. 512x512px, max. 5MB)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			filePath := args[0]
+			info, err := media.ValidateAndInspectImage(filePath)
+			if err != nil {
+				return err
+			}
+
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			ticket, err := cli.GetAvatarUploadTicket(context.Background(), &v1.GetAvatarUploadTicketRequest{
+				ContentType: info.ContentType,
+				ByteSize:    info.Size,
+				Sha256:      info.SHA256,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get avatar upload ticket: %w", err)
+			}
+
+			if err := media.UploadToS3(context.Background(), ticket.UploadUrl, filePath, info.ContentType, ticket.Headers); err != nil {
+				return fmt.Errorf("failed to upload image to storage: %w", err)
+			}
+
+			profile, err := cli.SetAvatar(context.Background(), &v1.SetAvatarRequest{
+				BlobId: ticket.BlobId,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to attach avatar: %w", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Avatar erfolgreich aktualisiert (Bild: %dx%dpx, %.2f KB)\n", info.Width, info.Height, float64(info.Size)/1024)
+			return output.PrintProfile(cmd.OutOrStdout(), profile, opts.JSONOutput)
+		},
+	}
+
+	avatarRemoveCmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Eigenes Avatar-Bild entfernen",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			profile, err := cli.RemoveAvatar(context.Background(), &v1.RemoveAvatarRequest{})
+			if err != nil {
+				return fmt.Errorf("failed to remove avatar: %w", err)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), "Avatar erfolgreich entfernt.")
+			return output.PrintProfile(cmd.OutOrStdout(), profile, opts.JSONOutput)
+		},
+	}
+	avatarCmd.AddCommand(avatarSetCmd, avatarRemoveCmd)
+
+	profileCmd.AddCommand(showCmd, updateCmd, passwordCmd, emailChangeCmd, deleteCmd, avatarCmd)
 	return profileCmd
 }
 
@@ -648,7 +717,84 @@ func newOrgCmd(opts *Options) *cobra.Command {
 	}
 	deleteCmd.Flags().BoolVar(&orgDeleteYes, "yes", false, "Löschung bestätigen")
 
-	orgCmd.AddCommand(listCmd, createCmd, showCmd, updateCmd, deleteCmd)
+	logoCmd := &cobra.Command{
+		Use:   "logo",
+		Short: "Firmenlogo einer Organisation verwalten",
+	}
+
+	logoSetCmd := &cobra.Command{
+		Use:   "set <id-or-handle> <filepath>",
+		Short: "Firmenlogo hochladen (1:1 quadratisch, min. 512x512px, max. 5MB, nur für Owner)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			idOrHandle := args[0]
+			filePath := args[1]
+
+			info, err := media.ValidateAndInspectImage(filePath)
+			if err != nil {
+				return err
+			}
+
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			ticket, err := cli.GetOrganizationLogoUploadTicket(context.Background(), &v1.GetOrganizationLogoUploadTicketRequest{
+				IdOrHandle:  idOrHandle,
+				ContentType: info.ContentType,
+				ByteSize:    info.Size,
+				Sha256:      info.SHA256,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get logo upload ticket: %w", err)
+			}
+
+			if err := media.UploadToS3(context.Background(), ticket.UploadUrl, filePath, info.ContentType, ticket.Headers); err != nil {
+				return fmt.Errorf("failed to upload logo to storage: %w", err)
+			}
+
+			org, err := cli.SetOrganizationLogo(context.Background(), &v1.SetOrganizationLogoRequest{
+				IdOrHandle: idOrHandle,
+				BlobId:     ticket.BlobId,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to attach organization logo: %w", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Firmenlogo erfolgreich aktualisiert (Bild: %dx%dpx, %.2f KB)\n", info.Width, info.Height, float64(info.Size)/1024)
+			return output.PrintOrganization(cmd.OutOrStdout(), org, opts.JSONOutput)
+		},
+	}
+
+	logoRemoveCmd := &cobra.Command{
+		Use:   "remove <id-or-handle>",
+		Short: "Firmenlogo einer Organisation entfernen (nur für Owner)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			idOrHandle := args[0]
+
+			cli, closeFn, _, err := resolveClient(opts)
+			if err != nil {
+				return err
+			}
+			defer closeFn()
+
+			org, err := cli.RemoveOrganizationLogo(context.Background(), &v1.RemoveOrganizationLogoRequest{
+				IdOrHandle: idOrHandle,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to remove organization logo: %w", err)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), "Firmenlogo erfolgreich entfernt.")
+			return output.PrintOrganization(cmd.OutOrStdout(), org, opts.JSONOutput)
+		},
+	}
+	logoCmd.AddCommand(logoSetCmd, logoRemoveCmd)
+
+	orgCmd.AddCommand(listCmd, createCmd, showCmd, updateCmd, deleteCmd, logoCmd)
 	return orgCmd
 }
 

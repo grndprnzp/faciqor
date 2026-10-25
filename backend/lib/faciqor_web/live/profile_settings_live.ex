@@ -3,11 +3,16 @@ defmodule FaciqorWeb.ProfileSettingsLive do
   require Ash.Query
 
   alias Faciqor.Accounts
+  alias Faciqor.Media
+  alias Faciqor.Media.ImageProcessing
+  alias Faciqor.Media.Storage
+  alias Faciqor.Media.Workers.ProcessImageVariants
 
   @impl true
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
-    user = Ash.load!(user, [:identities], actor: user)
+    user = Ash.load!(user, [:identities, :avatar_blob], actor: user)
+    avatar_url = resolve_avatar_url(user)
 
     tokens = load_tokens(user)
     orphaned_orgs = Accounts.list_orphaned_organizations_for_user(user.id)
@@ -32,22 +37,113 @@ defmodule FaciqorWeb.ProfileSettingsLive do
 
     has_google = Enum.any?(user.identities || [], &(&1.strategy == "google"))
 
-    {:ok,
-     socket
-     |> assign(:current_user, user)
-     |> assign(:profile_form, profile_form)
-     |> assign(:password_form, password_form)
-     |> assign(:email_change_form, email_change_form)
-     |> assign(:api_tokens, tokens)
-     |> assign(:new_token_name, "")
-     |> assign(:new_token_expiry_days, "365")
-     |> assign(:new_token_scope, "all")
-     |> assign(:newly_created_plain_token, nil)
-     |> assign(:orphaned_orgs, orphaned_orgs)
-     |> assign(:user_orgs, user_orgs)
-     |> assign(:has_google_identity, has_google)
-     |> assign(:show_email_change_form, false)
-     |> assign(:delete_confirm_handle, "")}
+     {:ok,
+      socket
+      |> assign(:current_user, user)
+      |> assign(:avatar_url, avatar_url)
+      |> assign(:profile_form, profile_form)
+      |> assign(:password_form, password_form)
+      |> assign(:email_change_form, email_change_form)
+      |> assign(:api_tokens, tokens)
+      |> assign(:new_token_name, "")
+      |> assign(:new_token_expiry_days, "365")
+      |> assign(:new_token_scope, "all")
+      |> assign(:newly_created_plain_token, nil)
+      |> assign(:orphaned_orgs, orphaned_orgs)
+      |> assign(:user_orgs, user_orgs)
+      |> assign(:has_google_identity, has_google)
+      |> assign(:show_email_change_form, false)
+      |> assign(:delete_confirm_handle, "")}
+  end
+
+  @impl true
+  def handle_event("save_avatar", %{"data" => "data:image/" <> _ = data_url}, socket) do
+    user = socket.assigns.current_user
+    [_header, base64_content] = String.split(data_url, ",", parts: 2)
+
+    case Base.decode64(base64_content) do
+      {:ok, binary} ->
+        case ImageProcessing.validate_avatar_or_logo(binary) do
+          {:ok, %{width: width, height: height}} ->
+            bucket = Storage.public_bucket()
+            key = "avatars/#{user.id}/#{Ecto.UUID.generate()}.png"
+
+            case Storage.put_object(bucket, key, binary, "image/png") do
+              {:ok, _} ->
+                {:ok, blob} =
+                  Media.create_storage_blob(
+                    %{
+                      bucket: bucket,
+                      key: key,
+                      content_type: "image/png",
+                      byte_size: byte_size(binary),
+                      width: width,
+                      height: height,
+                      context: :avatar,
+                      user_id: user.id
+                    },
+                    actor: user
+                  )
+
+                case Accounts.set_user_avatar(user, blob.id, actor: user) do
+                  {:ok, updated_user} ->
+                    ProcessImageVariants.new(%{"blob_id" => blob.id})
+                    |> Oban.insert()
+
+                    updated_user = Ash.load!(updated_user, [:identities, :avatar_blob], actor: updated_user)
+
+                    {:noreply,
+                     socket
+                     |> assign(:current_user, updated_user)
+                     |> assign(:avatar_url, resolve_avatar_url(updated_user))
+                     |> put_flash(:info, "Avatar erfolgreich aktualisiert.")}
+
+                  {:error, _} ->
+                    {:noreply, put_flash(socket, :error, "Fehler beim Zuweisen des Avatars.")}
+                end
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Fehler beim Speichern der Bilddatei.")}
+            end
+
+          {:error, {:not_square, w, h}} ->
+            {:noreply, put_flash(socket, :error, "Das Bild muss quadratisch sein (1:1 Seitenverhältnis, aktuell #{w}x#{h}).")}
+
+          {:error, {:dimensions_too_small, w, h, min}} ->
+            {:noreply, put_flash(socket, :error, "Das Bild muss mindestens #{min}x#{min}px groß sein (aktuell #{w}x#{h}px).")}
+
+          {:error, :file_too_large} ->
+            {:noreply, put_flash(socket, :error, "Das Bild darf maximal 5MB groß sein.")}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Ungültiges Bildformat.")}
+        end
+
+      :error ->
+        {:noreply, put_flash(socket, :error, "Fehler beim Dekodieren der Bilddaten.")}
+    end
+  end
+
+  def handle_event("save_avatar", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Ungültige Bildübertragung.")}
+  end
+
+  def handle_event("remove_avatar", _params, socket) do
+    user = socket.assigns.current_user
+
+    case Accounts.remove_user_avatar(user, actor: user) do
+      {:ok, updated_user} ->
+        updated_user = Ash.load!(updated_user, [:identities, :avatar_blob], actor: updated_user)
+
+        {:noreply,
+         socket
+         |> assign(:current_user, updated_user)
+         |> assign(:avatar_url, nil)
+         |> put_flash(:info, "Avatar wurde entfernt.")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Avatar konnte nicht entfernt werden.")}
+    end
   end
 
   @impl true
@@ -299,6 +395,110 @@ defmodule FaciqorWeb.ProfileSettingsLive do
           Verwalten Sie Ihre persönlichen Stammdaten, Anmeldedaten, CLI-Zugangstokens und Mandanten.
         </p>
       </div>
+
+      <%!-- Card: Avatar & Profilbild --%>
+      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
+        <div class="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">Profilbild / Avatar</h2>
+            <p class="text-xs text-[var(--fq-color-text-muted)]">
+              Öffentlich sichtbar im Hub und bei Vor-Ort-Einsätzen. Quadratisch 1:1, mind. 512x512px, max. 5MB.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
+              1:1 Quadrat
+            </span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
+              Min. 512px
+            </span>
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
+              Max. 5MB
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-6 pt-2">
+          <div class="relative group">
+            <div class="w-24 h-24 rounded-full overflow-hidden border-2 border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-muted)] flex items-center justify-center shadow-xs">
+              <%= if @avatar_url do %>
+                <img src={@avatar_url} alt="Avatar" class="w-full h-full object-cover" />
+              <% else %>
+                <span class="text-2xl font-bold text-[var(--fq-color-text-muted)]">
+                  <%= String.upcase(String.slice(@current_user.display_name || to_string(@current_user.handle) || "U", 0, 2)) %>
+                </span>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div
+              id="avatar-cropper-trigger"
+              phx-hook="ImageCropper"
+              data-modal-id="avatar-crop-modal"
+              data-preview-id="avatar-crop-preview"
+              data-confirm-btn-id="avatar-crop-confirm"
+              data-cancel-btn-id="avatar-crop-cancel"
+              data-event="save_avatar"
+            >
+              <label class="cursor-pointer inline-flex items-center px-3 py-1.5 border border-[var(--fq-color-border-strong)] rounded text-xs font-semibold text-[var(--fq-color-text-main)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)] shadow-xs transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1.5">
+                  <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 013.25 3h13.5A2.25 2.25 0 0119 5.25v9.5A2.25 2.25 0 0116.75 17H3.25A2.25 2.25 0 011 14.75v-9.5zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 00.75-.75v-2.69l-2.22-2.22a.75.75 0 00-1.06 0l-1.91 1.91-3.47-3.47a.75.75 0 00-1.06 0L2.5 11.06zm10.75-4.31a1.25 1.25 0 11-2.5 0 1.25 1.25 0 012.5 0z" clip-rule="evenodd" />
+                </svg>
+                Avatar ändern
+                <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+              </label>
+            </div>
+
+            <%= if @avatar_url do %>
+              <div>
+                <button
+                  type="button"
+                  phx-click="remove_avatar"
+                  data-confirm="Möchten Sie Ihren Avatar wirklich entfernen?"
+                  class="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700 hover:underline flex items-center gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
+                  </svg>
+                  Avatar entfernen
+                </button>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <%!-- Modal für interaktiven Bildzuschnitt --%>
+        <div id="avatar-crop-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+          <div class="bg-[var(--fq-color-bg-surface)] rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4 border border-[var(--fq-color-border)]">
+            <div class="flex items-center justify-between border-b border-[var(--fq-color-border)] pb-3">
+              <h3 class="text-sm font-bold text-[var(--fq-color-text-main)]">Avatar zuschneiden (1:1 Quadrat)</h3>
+              <span class="text-xs text-[var(--fq-color-text-muted)]">Maus/Touch zum Verschieben & Zoomen</span>
+            </div>
+
+            <div id="avatar-crop-preview-wrapper" phx-update="ignore" class="w-full h-80 overflow-hidden bg-black rounded flex items-center justify-center relative">
+              <img id="avatar-crop-preview" src="" alt="Vorschau" class="max-h-full block" />
+            </div>
+
+            <div class="flex justify-end gap-3 pt-3 border-t border-[var(--fq-color-border)]">
+              <button
+                id="avatar-crop-cancel"
+                type="button"
+                class="cursor-pointer px-4 py-2 border border-[var(--fq-color-border)] rounded text-xs font-semibold text-[var(--fq-color-text-main)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
+              >
+                Abbrechen
+              </button>
+              <button
+                id="avatar-crop-confirm"
+                type="button"
+                class="cursor-pointer px-4 py-2 bg-[var(--fq-color-primary)] hover:bg-[var(--fq-color-primary-hover)] text-white rounded text-xs font-semibold shadow-xs"
+              >
+                Zuschneiden & Speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <%!-- Card 1: User Profile & Stammdaten --%>
       <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
@@ -762,4 +962,12 @@ defmodule FaciqorWeb.ProfileSettingsLive do
     </div>
     """
   end
+
+  defp resolve_avatar_url(%{avatar_blob: %{variants: %{"512" => key}}}) when is_binary(key),
+    do: Storage.public_url(key)
+
+  defp resolve_avatar_url(%{avatar_blob: %{key: key}}) when is_binary(key),
+    do: Storage.public_url(key)
+
+  defp resolve_avatar_url(_), do: nil
 end

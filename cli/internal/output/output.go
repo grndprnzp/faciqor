@@ -33,6 +33,9 @@ func PrintProfile(w io.Writer, profile *v1.UserProfileResponse, asJSON bool) err
 		if profile.PendingEmail != nil {
 			m["pending_email"] = *profile.PendingEmail
 		}
+		if profile.AvatarUrl != nil {
+			m["avatar_url"] = *profile.AvatarUrl
+		}
 		return PrintJSON(w, m)
 	}
 
@@ -55,6 +58,9 @@ func PrintProfile(w io.Writer, profile *v1.UserProfileResponse, asJSON bool) err
 	fmt.Fprintf(tw, "TIMEZONE:\t%s\n", profile.Timezone)
 	fmt.Fprintf(tw, "LOCALE:\t%s\n", profile.Locale)
 	fmt.Fprintf(tw, "VERIFIED:\t%v\n", profile.EmailVerified)
+	if profile.AvatarUrl != nil && *profile.AvatarUrl != "" {
+		fmt.Fprintf(tw, "AVATAR URL:\t%s\n", *profile.AvatarUrl)
+	}
 	fmt.Fprintf(tw, "CREATED:\t%s\n", profile.InsertedAt)
 	return tw.Flush()
 }
@@ -102,6 +108,9 @@ func PrintOrganization(w io.Writer, org *v1.OrganizationResponse, asJSON bool) e
 	fmt.Fprintf(tw, "TAX ID:\t%s\n", org.TaxId)
 	fmt.Fprintf(tw, "VAT ID:\t%s\n", org.VatId)
 	fmt.Fprintf(tw, "CONTACT EMAIL:\t%s\n", org.ContactEmail)
+	if org.LogoUrl != nil && *org.LogoUrl != "" {
+		fmt.Fprintf(tw, "LOGO URL:\t%s\n", *org.LogoUrl)
+	}
 	if org.DeletedAt != nil {
 		fmt.Fprintf(tw, "DELETED AT:\t%s\n", *org.DeletedAt)
 	}
@@ -142,6 +151,9 @@ func orgToMap(org *v1.OrganizationResponse) map[string]interface{} {
 		"tax_id":         org.TaxId,
 		"vat_id":         org.VatId,
 		"contact_email":  org.ContactEmail,
+	}
+	if org.LogoUrl != nil {
+		m["logo_url"] = *org.LogoUrl
 	}
 	if org.DeletedAt != nil {
 		m["deleted_at"] = *org.DeletedAt

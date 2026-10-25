@@ -17,5 +17,15 @@ config :faciqor, :token_signing_secret, "test_token_signing_secret_at_least_32_b
 
 config :faciqor, Oban, testing: :manual
 
+config :ex_aws,
+  access_key_id: "test",
+  secret_access_key: "test",
+  region: "us-east-1"
+
+config :ex_aws, :s3,
+  scheme: "http://",
+  host: "localhost",
+  port: 8333
+
 config :logger, level: :warning
 config :phoenix, :plug_init_mode, :runtime

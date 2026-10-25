@@ -179,4 +179,38 @@ defmodule FaciqorWeb.ProfileSettingsLiveTest do
       assert html =~ "Vom System abmelden"
     end
   end
+
+  describe "Avatar Upload & Removal" do
+    test "saving and removing avatar via LiveView", %{conn: conn, user: user} do
+      {:ok, view, html} = live(conn, ~p"/settings/profile")
+
+      assert html =~ "Avatar ändern"
+      assert has_element?(view, "#avatar-cropper-trigger")
+
+      # Generate valid 512x512 image in memory
+      {:ok, img} = Image.new(512, 512, color: :blue)
+      {:ok, binary} = Image.write(img, :memory, suffix: ".png")
+      base64 = Base.encode64(binary)
+      data_url = "data:image/png;base64,#{base64}"
+
+      # Trigger save_avatar event
+      render_hook(view, "save_avatar", %{"data" => data_url})
+
+      # Verify user has avatar blob attached
+      updated_user = Ash.get!(User, user.id, authorize?: false)
+      assert updated_user.avatar_blob_id != nil
+
+      # Check HTML renders success message and remove button
+      html = render(view)
+      assert html =~ "Avatar erfolgreich aktualisiert"
+      assert html =~ "Avatar entfernen"
+
+      # Remove avatar
+      render_click(view, :remove_avatar, %{})
+
+      user_after_removal = Ash.get!(User, user.id, authorize?: false)
+      assert is_nil(user_after_removal.avatar_blob_id)
+      assert render(view) =~ "Avatar wurde entfernt"
+    end
+  end
 end

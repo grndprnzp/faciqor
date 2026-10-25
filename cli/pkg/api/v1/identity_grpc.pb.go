@@ -19,19 +19,25 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	IdentityService_GetMyProfile_FullMethodName           = "/faciqor.v1.IdentityService/GetMyProfile"
-	IdentityService_UpdateMyProfile_FullMethodName        = "/faciqor.v1.IdentityService/UpdateMyProfile"
-	IdentityService_ChangePassword_FullMethodName         = "/faciqor.v1.IdentityService/ChangePassword"
-	IdentityService_RequestEmailChange_FullMethodName     = "/faciqor.v1.IdentityService/RequestEmailChange"
-	IdentityService_RequestAccountDeletion_FullMethodName = "/faciqor.v1.IdentityService/RequestAccountDeletion"
-	IdentityService_ListApiTokens_FullMethodName          = "/faciqor.v1.IdentityService/ListApiTokens"
-	IdentityService_CreateApiToken_FullMethodName         = "/faciqor.v1.IdentityService/CreateApiToken"
-	IdentityService_RevokeApiToken_FullMethodName         = "/faciqor.v1.IdentityService/RevokeApiToken"
-	IdentityService_CreateOrganization_FullMethodName     = "/faciqor.v1.IdentityService/CreateOrganization"
-	IdentityService_ListMyOrganizations_FullMethodName    = "/faciqor.v1.IdentityService/ListMyOrganizations"
-	IdentityService_GetOrganization_FullMethodName        = "/faciqor.v1.IdentityService/GetOrganization"
-	IdentityService_UpdateOrganization_FullMethodName     = "/faciqor.v1.IdentityService/UpdateOrganization"
-	IdentityService_SoftDeleteOrganization_FullMethodName = "/faciqor.v1.IdentityService/SoftDeleteOrganization"
+	IdentityService_GetMyProfile_FullMethodName                    = "/faciqor.v1.IdentityService/GetMyProfile"
+	IdentityService_UpdateMyProfile_FullMethodName                 = "/faciqor.v1.IdentityService/UpdateMyProfile"
+	IdentityService_ChangePassword_FullMethodName                  = "/faciqor.v1.IdentityService/ChangePassword"
+	IdentityService_RequestEmailChange_FullMethodName              = "/faciqor.v1.IdentityService/RequestEmailChange"
+	IdentityService_RequestAccountDeletion_FullMethodName          = "/faciqor.v1.IdentityService/RequestAccountDeletion"
+	IdentityService_ListApiTokens_FullMethodName                   = "/faciqor.v1.IdentityService/ListApiTokens"
+	IdentityService_CreateApiToken_FullMethodName                  = "/faciqor.v1.IdentityService/CreateApiToken"
+	IdentityService_RevokeApiToken_FullMethodName                  = "/faciqor.v1.IdentityService/RevokeApiToken"
+	IdentityService_CreateOrganization_FullMethodName              = "/faciqor.v1.IdentityService/CreateOrganization"
+	IdentityService_ListMyOrganizations_FullMethodName             = "/faciqor.v1.IdentityService/ListMyOrganizations"
+	IdentityService_GetOrganization_FullMethodName                 = "/faciqor.v1.IdentityService/GetOrganization"
+	IdentityService_UpdateOrganization_FullMethodName              = "/faciqor.v1.IdentityService/UpdateOrganization"
+	IdentityService_SoftDeleteOrganization_FullMethodName          = "/faciqor.v1.IdentityService/SoftDeleteOrganization"
+	IdentityService_GetAvatarUploadTicket_FullMethodName           = "/faciqor.v1.IdentityService/GetAvatarUploadTicket"
+	IdentityService_SetAvatar_FullMethodName                       = "/faciqor.v1.IdentityService/SetAvatar"
+	IdentityService_RemoveAvatar_FullMethodName                    = "/faciqor.v1.IdentityService/RemoveAvatar"
+	IdentityService_GetOrganizationLogoUploadTicket_FullMethodName = "/faciqor.v1.IdentityService/GetOrganizationLogoUploadTicket"
+	IdentityService_SetOrganizationLogo_FullMethodName             = "/faciqor.v1.IdentityService/SetOrganizationLogo"
+	IdentityService_RemoveOrganizationLogo_FullMethodName          = "/faciqor.v1.IdentityService/RemoveOrganizationLogo"
 )
 
 // IdentityServiceClient is the client API for IdentityService service.
@@ -54,6 +60,13 @@ type IdentityServiceClient interface {
 	GetOrganization(ctx context.Context, in *GetOrganizationRequest, opts ...grpc.CallOption) (*OrganizationResponse, error)
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*OrganizationResponse, error)
 	SoftDeleteOrganization(ctx context.Context, in *SoftDeleteOrganizationRequest, opts ...grpc.CallOption) (*OrganizationResponse, error)
+	// Avatar & Organization Logo Uploads
+	GetAvatarUploadTicket(ctx context.Context, in *GetAvatarUploadTicketRequest, opts ...grpc.CallOption) (*UploadTicketResponse, error)
+	SetAvatar(ctx context.Context, in *SetAvatarRequest, opts ...grpc.CallOption) (*UserProfileResponse, error)
+	RemoveAvatar(ctx context.Context, in *RemoveAvatarRequest, opts ...grpc.CallOption) (*UserProfileResponse, error)
+	GetOrganizationLogoUploadTicket(ctx context.Context, in *GetOrganizationLogoUploadTicketRequest, opts ...grpc.CallOption) (*UploadTicketResponse, error)
+	SetOrganizationLogo(ctx context.Context, in *SetOrganizationLogoRequest, opts ...grpc.CallOption) (*OrganizationResponse, error)
+	RemoveOrganizationLogo(ctx context.Context, in *RemoveOrganizationLogoRequest, opts ...grpc.CallOption) (*OrganizationResponse, error)
 }
 
 type identityServiceClient struct {
@@ -181,6 +194,60 @@ func (c *identityServiceClient) SoftDeleteOrganization(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *identityServiceClient) GetAvatarUploadTicket(ctx context.Context, in *GetAvatarUploadTicketRequest, opts ...grpc.CallOption) (*UploadTicketResponse, error) {
+	out := new(UploadTicketResponse)
+	err := c.cc.Invoke(ctx, IdentityService_GetAvatarUploadTicket_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) SetAvatar(ctx context.Context, in *SetAvatarRequest, opts ...grpc.CallOption) (*UserProfileResponse, error) {
+	out := new(UserProfileResponse)
+	err := c.cc.Invoke(ctx, IdentityService_SetAvatar_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RemoveAvatar(ctx context.Context, in *RemoveAvatarRequest, opts ...grpc.CallOption) (*UserProfileResponse, error) {
+	out := new(UserProfileResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RemoveAvatar_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) GetOrganizationLogoUploadTicket(ctx context.Context, in *GetOrganizationLogoUploadTicketRequest, opts ...grpc.CallOption) (*UploadTicketResponse, error) {
+	out := new(UploadTicketResponse)
+	err := c.cc.Invoke(ctx, IdentityService_GetOrganizationLogoUploadTicket_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) SetOrganizationLogo(ctx context.Context, in *SetOrganizationLogoRequest, opts ...grpc.CallOption) (*OrganizationResponse, error) {
+	out := new(OrganizationResponse)
+	err := c.cc.Invoke(ctx, IdentityService_SetOrganizationLogo_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RemoveOrganizationLogo(ctx context.Context, in *RemoveOrganizationLogoRequest, opts ...grpc.CallOption) (*OrganizationResponse, error) {
+	out := new(OrganizationResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RemoveOrganizationLogo_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IdentityServiceServer is the server API for IdentityService service.
 // All implementations must embed UnimplementedIdentityServiceServer
 // for forward compatibility
@@ -201,6 +268,13 @@ type IdentityServiceServer interface {
 	GetOrganization(context.Context, *GetOrganizationRequest) (*OrganizationResponse, error)
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*OrganizationResponse, error)
 	SoftDeleteOrganization(context.Context, *SoftDeleteOrganizationRequest) (*OrganizationResponse, error)
+	// Avatar & Organization Logo Uploads
+	GetAvatarUploadTicket(context.Context, *GetAvatarUploadTicketRequest) (*UploadTicketResponse, error)
+	SetAvatar(context.Context, *SetAvatarRequest) (*UserProfileResponse, error)
+	RemoveAvatar(context.Context, *RemoveAvatarRequest) (*UserProfileResponse, error)
+	GetOrganizationLogoUploadTicket(context.Context, *GetOrganizationLogoUploadTicketRequest) (*UploadTicketResponse, error)
+	SetOrganizationLogo(context.Context, *SetOrganizationLogoRequest) (*OrganizationResponse, error)
+	RemoveOrganizationLogo(context.Context, *RemoveOrganizationLogoRequest) (*OrganizationResponse, error)
 	mustEmbedUnimplementedIdentityServiceServer()
 }
 
@@ -246,6 +320,24 @@ func (UnimplementedIdentityServiceServer) UpdateOrganization(context.Context, *U
 }
 func (UnimplementedIdentityServiceServer) SoftDeleteOrganization(context.Context, *SoftDeleteOrganizationRequest) (*OrganizationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SoftDeleteOrganization not implemented")
+}
+func (UnimplementedIdentityServiceServer) GetAvatarUploadTicket(context.Context, *GetAvatarUploadTicketRequest) (*UploadTicketResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAvatarUploadTicket not implemented")
+}
+func (UnimplementedIdentityServiceServer) SetAvatar(context.Context, *SetAvatarRequest) (*UserProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAvatar not implemented")
+}
+func (UnimplementedIdentityServiceServer) RemoveAvatar(context.Context, *RemoveAvatarRequest) (*UserProfileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveAvatar not implemented")
+}
+func (UnimplementedIdentityServiceServer) GetOrganizationLogoUploadTicket(context.Context, *GetOrganizationLogoUploadTicketRequest) (*UploadTicketResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOrganizationLogoUploadTicket not implemented")
+}
+func (UnimplementedIdentityServiceServer) SetOrganizationLogo(context.Context, *SetOrganizationLogoRequest) (*OrganizationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetOrganizationLogo not implemented")
+}
+func (UnimplementedIdentityServiceServer) RemoveOrganizationLogo(context.Context, *RemoveOrganizationLogoRequest) (*OrganizationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveOrganizationLogo not implemented")
 }
 func (UnimplementedIdentityServiceServer) mustEmbedUnimplementedIdentityServiceServer() {}
 
@@ -494,6 +586,114 @@ func _IdentityService_SoftDeleteOrganization_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_GetAvatarUploadTicket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAvatarUploadTicketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).GetAvatarUploadTicket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_GetAvatarUploadTicket_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).GetAvatarUploadTicket(ctx, req.(*GetAvatarUploadTicketRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_SetAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).SetAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_SetAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).SetAvatar(ctx, req.(*SetAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RemoveAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveAvatarRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RemoveAvatar(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RemoveAvatar_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RemoveAvatar(ctx, req.(*RemoveAvatarRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_GetOrganizationLogoUploadTicket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationLogoUploadTicketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).GetOrganizationLogoUploadTicket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_GetOrganizationLogoUploadTicket_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).GetOrganizationLogoUploadTicket(ctx, req.(*GetOrganizationLogoUploadTicketRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_SetOrganizationLogo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetOrganizationLogoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).SetOrganizationLogo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_SetOrganizationLogo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).SetOrganizationLogo(ctx, req.(*SetOrganizationLogoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RemoveOrganizationLogo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveOrganizationLogoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RemoveOrganizationLogo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RemoveOrganizationLogo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RemoveOrganizationLogo(ctx, req.(*RemoveOrganizationLogoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IdentityService_ServiceDesc is the grpc.ServiceDesc for IdentityService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -552,6 +752,30 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SoftDeleteOrganization",
 			Handler:    _IdentityService_SoftDeleteOrganization_Handler,
+		},
+		{
+			MethodName: "GetAvatarUploadTicket",
+			Handler:    _IdentityService_GetAvatarUploadTicket_Handler,
+		},
+		{
+			MethodName: "SetAvatar",
+			Handler:    _IdentityService_SetAvatar_Handler,
+		},
+		{
+			MethodName: "RemoveAvatar",
+			Handler:    _IdentityService_RemoveAvatar_Handler,
+		},
+		{
+			MethodName: "GetOrganizationLogoUploadTicket",
+			Handler:    _IdentityService_GetOrganizationLogoUploadTicket_Handler,
+		},
+		{
+			MethodName: "SetOrganizationLogo",
+			Handler:    _IdentityService_SetOrganizationLogo_Handler,
+		},
+		{
+			MethodName: "RemoveOrganizationLogo",
+			Handler:    _IdentityService_RemoveOrganizationLogo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -52,6 +52,8 @@ defmodule Faciqor.V1.UserProfileResponse do
   field :timezone, 10, type: :string
   field :locale, 11, type: :string
   field :pending_email, 12, optional: true, type: :string, json_name: "pendingEmail"
+  field :avatar_url, 13, optional: true, type: :string, json_name: "avatarUrl"
+  field :avatar_variants, 14, optional: true, type: Faciqor.V1.MediaVariants, json_name: "avatarVariants"
 end
 
 defmodule Faciqor.V1.ChangePasswordRequest do
@@ -223,6 +225,8 @@ defmodule Faciqor.V1.OrganizationResponse do
   field :vat_id, 13, type: :string, json_name: "vatId"
   field :contact_email, 14, type: :string, json_name: "contactEmail"
   field :deleted_at, 15, proto3_optional: true, type: :string, json_name: "deletedAt"
+  field :logo_url, 16, proto3_optional: true, type: :string, json_name: "logoUrl"
+  field :logo_variants, 17, proto3_optional: true, type: Faciqor.V1.MediaVariants, json_name: "logoVariants"
 end
 
 defmodule Faciqor.V1.ListMyOrganizationsRequest do
@@ -254,6 +258,86 @@ defmodule Faciqor.V1.IdentityService.Service do
   rpc :GetOrganization, Faciqor.V1.GetOrganizationRequest, Faciqor.V1.OrganizationResponse
   rpc :UpdateOrganization, Faciqor.V1.UpdateOrganizationRequest, Faciqor.V1.OrganizationResponse
   rpc :SoftDeleteOrganization, Faciqor.V1.SoftDeleteOrganizationRequest, Faciqor.V1.OrganizationResponse
+  rpc :GetAvatarUploadTicket, Faciqor.V1.GetAvatarUploadTicketRequest, Faciqor.V1.UploadTicketResponse
+  rpc :SetAvatar, Faciqor.V1.SetAvatarRequest, Faciqor.V1.UserProfileResponse
+  rpc :RemoveAvatar, Faciqor.V1.RemoveAvatarRequest, Faciqor.V1.UserProfileResponse
+  rpc :GetOrganizationLogoUploadTicket, Faciqor.V1.GetOrganizationLogoUploadTicketRequest, Faciqor.V1.UploadTicketResponse
+  rpc :SetOrganizationLogo, Faciqor.V1.SetOrganizationLogoRequest, Faciqor.V1.OrganizationResponse
+  rpc :RemoveOrganizationLogo, Faciqor.V1.RemoveOrganizationLogoRequest, Faciqor.V1.OrganizationResponse
+end
+
+defmodule Faciqor.V1.MediaVariants do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :size_64, 1, proto3_optional: true, type: :string, json_name: "size64"
+  field :size_128, 2, proto3_optional: true, type: :string, json_name: "size128"
+  field :size_256, 3, proto3_optional: true, type: :string, json_name: "size256"
+  field :size_512, 4, proto3_optional: true, type: :string, json_name: "size512"
+end
+
+defmodule Faciqor.V1.GetAvatarUploadTicketRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :content_type, 1, type: :string, json_name: "contentType"
+  field :byte_size, 2, type: :int64, json_name: "byteSize"
+  field :sha256, 3, type: :string
+end
+
+defmodule Faciqor.V1.GetOrganizationLogoUploadTicketRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :id_or_handle, 1, type: :string, json_name: "idOrHandle"
+  field :content_type, 2, type: :string, json_name: "contentType"
+  field :byte_size, 3, type: :int64, json_name: "byteSize"
+  field :sha256, 4, type: :string
+end
+
+defmodule Faciqor.V1.UploadTicketResponse.HeadersEntry do
+  @moduledoc false
+  use Protobuf, map: true, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :key, 1, type: :string
+  field :value, 2, type: :string
+end
+
+defmodule Faciqor.V1.UploadTicketResponse do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :blob_id, 1, type: :string, json_name: "blobId"
+  field :upload_url, 2, type: :string, json_name: "uploadUrl"
+  field :storage_key, 3, type: :string, json_name: "storageKey"
+  field :headers, 4, repeated: true, type: Faciqor.V1.UploadTicketResponse.HeadersEntry, map: true
+end
+
+defmodule Faciqor.V1.SetAvatarRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :blob_id, 1, type: :string, json_name: "blobId"
+end
+
+defmodule Faciqor.V1.RemoveAvatarRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+end
+
+defmodule Faciqor.V1.SetOrganizationLogoRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :id_or_handle, 1, type: :string, json_name: "idOrHandle"
+  field :blob_id, 2, type: :string, json_name: "blobId"
+end
+
+defmodule Faciqor.V1.RemoveOrganizationLogoRequest do
+  @moduledoc false
+  use Protobuf, protoc_gen_elixir_version: "0.13.0", syntax: :proto3
+
+  field :id_or_handle, 1, type: :string, json_name: "idOrHandle"
 end
 
 defmodule Faciqor.V1.IdentityService.Stub do

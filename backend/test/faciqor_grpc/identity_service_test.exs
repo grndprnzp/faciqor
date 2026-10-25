@@ -105,6 +105,67 @@ defmodule FaciqorGrpc.IdentityServiceTest do
         )
 
       assert revoke_res.success == true
+
+      # Avatar upload ticket
+      avatar_ticket =
+        IdentityService.get_avatar_upload_ticket(
+          %V1.GetAvatarUploadTicketRequest{
+            content_type: "image/png",
+            byte_size: 1024,
+            sha256: "dummy-sha256"
+          },
+          nil
+        )
+
+      assert avatar_ticket.blob_id != ""
+      assert String.contains?(avatar_ticket.upload_url, "faciqor-public")
+      assert String.contains?(avatar_ticket.storage_key, "avatars/#{user.id}/")
+
+      # Set avatar
+      avatar_profile =
+        IdentityService.set_avatar(%V1.SetAvatarRequest{blob_id: avatar_ticket.blob_id}, nil)
+
+      assert avatar_profile.avatar_url != ""
+
+      # Remove avatar
+      cleared_profile = IdentityService.remove_avatar(%V1.RemoveAvatarRequest{}, nil)
+      assert is_nil(cleared_profile.avatar_url)
+
+      # Organization logo ticket (as owner)
+      logo_ticket =
+        IdentityService.get_organization_logo_upload_ticket(
+          %V1.GetOrganizationLogoUploadTicketRequest{
+            id_or_handle: org_res.id,
+            content_type: "image/png",
+            byte_size: 2048,
+            sha256: "dummy-sha256"
+          },
+          nil
+        )
+
+      assert logo_ticket.blob_id != ""
+      assert String.contains?(logo_ticket.storage_key, "logos/#{org_res.id}/")
+
+      # Set org logo
+      logo_org =
+        IdentityService.set_organization_logo(
+          %V1.SetOrganizationLogoRequest{
+            id_or_handle: org_res.id,
+            blob_id: logo_ticket.blob_id
+          },
+          nil
+        )
+
+      assert logo_org.logo_url != ""
+
+      # Remove org logo
+      cleared_logo_org =
+        IdentityService.remove_organization_logo(
+          %V1.RemoveOrganizationLogoRequest{id_or_handle: org_res.id},
+          nil
+        )
+
+      assert is_nil(cleared_logo_org.logo_url)
     end
   end
 end

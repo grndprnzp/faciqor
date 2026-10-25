@@ -67,12 +67,13 @@ faciqor/
 │   │   │   ├── accounts/           # Benutzer, Rollen, Mandanten (RLS)
 │   │   │   ├── accounting/         # Buchungsjournal, BetrKV-Regelwerk, DATEV
 │   │   │   ├── operations/         # Liegenschaften, Einheiten, GEFMA-Kataloge
+│   │   │   ├── media/              # Bildverarbeitung (Vix/libvips), S3-Storage-Adapter, Oban Worker
 │   │   │   └── repo.ex             # Ecto Repo mit RLS Tenant-Scoping
 │   │   ├── faciqor_web/            # FACIQOR HUB (Phoenix LiveView für Office-Personal)
 │   │   │   ├── endpoint.ex
 │   │   │   ├── router.ex           # Web-Routen & Session-Pipelines
-│   │   │   ├── components/         # LiveView UI-Komponenten
-│   │   │   └── live/               # LiveViews (Dashboard, Disposition, Journal)
+│   │   │   ├── components/         # LiveView UI-Komponenten (CropperJS Modal etc.)
+│   │   │   └── live/               # LiveViews (Dashboard, Disposition, Settings, Journal)
 │   │   └── faciqor_grpc/           # gRPC SERVER (Schnittstelle für CLI & Mobile)
 │   │       ├── endpoint.ex         # gRPC/Cowboy Listener
 │   │       ├── interceptors/       # Auth- & Tenant-Injection Interceptor
@@ -90,9 +91,10 @@ faciqor/
 │   │   └── faciqor/
 │   │       └── main.go             # Minimaler Einstiegspunkt
 │   ├── internal/
-│   │   ├── cmd/                    # Cobra Subcommands (root, accounting, tenant, completion)
+│   │   ├── cmd/                    # Cobra Subcommands (root, profile, org, auth, completion)
 │   │   ├── client/                 # gRPC Client Connection-Pool, TLS, Auth-Header
 │   │   ├── config/                 # Viper-Konfiguration (~/.config/faciqor/config.yaml)
+│   │   ├── media/                  # Lokale Bildvalidierung (1:1, 512px, 5MB) & S3 Direct Upload
 │   │   └── output/                 # Terminal-Formatierung (Tabellen, Human-Readable vs. --json)
 │   └── pkg/
 │       └── api/v1/                 # Aus proto/ via Buf generierter Go-Code

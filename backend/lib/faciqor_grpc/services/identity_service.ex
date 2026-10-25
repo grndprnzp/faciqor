@@ -240,6 +240,148 @@ defmodule FaciqorGrpc.Services.IdentityService do
     end
   end
 
+  # --- Avatar & Logo Upload RPCs ---
+
+  def get_avatar_upload_ticket(%V1.GetAvatarUploadTicketRequest{} = req, _stream) do
+    actor = current_actor!()
+    validate_upload_request!(req.byte_size, req.content_type)
+
+    ext = extension_for_mime(req.content_type)
+    key = "avatars/#{actor.id}/#{Ecto.UUID.generate()}.#{ext}"
+    bucket = Faciqor.Media.Storage.public_bucket()
+
+    {:ok, blob} =
+      Faciqor.Media.create_storage_blob(
+        %{
+          bucket: bucket,
+          key: key,
+          sha256: req.sha256,
+          content_type: req.content_type,
+          byte_size: req.byte_size,
+          context: :avatar,
+          user_id: actor.id
+        },
+        actor: actor
+      )
+
+    {:ok, upload_url} = Faciqor.Media.Storage.generate_presigned_put_url(bucket, key)
+
+    %V1.UploadTicketResponse{
+      blob_id: blob.id,
+      upload_url: upload_url,
+      storage_key: key,
+      headers: %{}
+    }
+  end
+
+  def set_avatar(%V1.SetAvatarRequest{blob_id: blob_id}, _stream) do
+    actor = current_actor!()
+
+    case Accounts.set_user_avatar(actor, blob_id, actor: actor) do
+      {:ok, updated_user} ->
+        # Asynchronously process variants via Oban
+        Faciqor.Media.Workers.ProcessImageVariants.new(%{"blob_id" => blob_id})
+        |> Oban.insert()
+
+        to_user_profile_response(updated_user)
+
+      {:error, err} ->
+        raise_ash_error!(err)
+    end
+  end
+
+  def remove_avatar(%V1.RemoveAvatarRequest{}, _stream) do
+    actor = current_actor!()
+
+    case Accounts.remove_user_avatar(actor, actor: actor) do
+      {:ok, updated_user} ->
+        to_user_profile_response(updated_user)
+
+      {:error, err} ->
+        raise_ash_error!(err)
+    end
+  end
+
+  def get_organization_logo_upload_ticket(%V1.GetOrganizationLogoUploadTicketRequest{} = req, _stream) do
+    actor = current_actor!()
+    validate_upload_request!(req.byte_size, req.content_type)
+
+    with {:ok, org} <- Accounts.get_organization_by_id_or_handle(req.id_or_handle, actor: actor) do
+      # Enforce owner permission
+      verify_org_owner!(org, actor.id)
+
+      ext = extension_for_mime(req.content_type)
+      key = "logos/#{org.id}/#{Ecto.UUID.generate()}.#{ext}"
+      bucket = Faciqor.Media.Storage.public_bucket()
+
+      {:ok, blob} =
+        Faciqor.Media.create_storage_blob(
+          %{
+            bucket: bucket,
+            key: key,
+            sha256: req.sha256,
+            content_type: req.content_type,
+            byte_size: req.byte_size,
+            context: :organization_logo,
+            organization_id: org.id
+          },
+          actor: actor
+        )
+
+      {:ok, upload_url} = Faciqor.Media.Storage.generate_presigned_put_url(bucket, key)
+
+      %V1.UploadTicketResponse{
+        blob_id: blob.id,
+        upload_url: upload_url,
+        storage_key: key,
+        headers: %{}
+      }
+    else
+      {:error, err} -> raise_ash_error!(err)
+    end
+  end
+
+  def set_organization_logo(%V1.SetOrganizationLogoRequest{id_or_handle: id_or_handle, blob_id: blob_id}, _stream) do
+    actor = current_actor!()
+
+    with {:ok, org} <- Accounts.get_organization_by_id_or_handle(id_or_handle, actor: actor) do
+      verify_org_owner!(org, actor.id)
+
+      case Accounts.set_organization_logo(org, blob_id, actor: actor) do
+        {:ok, updated_org} ->
+          Faciqor.Media.Workers.ProcessImageVariants.new(%{"blob_id" => blob_id})
+          |> Oban.insert()
+
+          updated_org = Ash.load!(updated_org, :memberships, actor: actor)
+          to_organization_response(updated_org, actor.id)
+
+        {:error, err} ->
+          raise_ash_error!(err)
+      end
+    else
+      {:error, err} -> raise_ash_error!(err)
+    end
+  end
+
+  def remove_organization_logo(%V1.RemoveOrganizationLogoRequest{id_or_handle: id_or_handle}, _stream) do
+    actor = current_actor!()
+
+    with {:ok, org} <- Accounts.get_organization_by_id_or_handle(id_or_handle, actor: actor) do
+      verify_org_owner!(org, actor.id)
+
+      case Accounts.remove_organization_logo(org, actor: actor) do
+        {:ok, updated_org} ->
+          updated_org = Ash.load!(updated_org, :memberships, actor: actor)
+          to_organization_response(updated_org, actor.id)
+
+        {:error, err} ->
+          raise_ash_error!(err)
+      end
+    else
+      {:error, err} -> raise_ash_error!(err)
+    end
+  end
+
   # --- Helpers & Mappers ---
 
   defp current_actor! do
@@ -250,6 +392,8 @@ defmodule FaciqorGrpc.Services.IdentityService do
   end
 
   defp to_user_profile_response(%Accounts.User{} = user) do
+    {avatar_url, avatar_variants} = resolve_media_urls(user.avatar_blob_id)
+
     %V1.UserProfileResponse{
       id: user.id,
       email: to_string(user.email),
@@ -262,7 +406,9 @@ defmodule FaciqorGrpc.Services.IdentityService do
       phone: user.phone || "",
       timezone: user.timezone || "Europe/Berlin",
       locale: user.locale || "de",
-      pending_email: if(user.pending_email, do: to_string(user.pending_email), else: nil)
+      pending_email: if(user.pending_email, do: to_string(user.pending_email), else: nil),
+      avatar_url: avatar_url,
+      avatar_variants: avatar_variants
     }
   end
 
@@ -288,6 +434,8 @@ defmodule FaciqorGrpc.Services.IdentityService do
         _ -> :MEMBERSHIP_ROLE_UNSPECIFIED
       end
 
+    {logo_url, logo_variants} = resolve_media_urls(org.logo_blob_id)
+
     %V1.OrganizationResponse{
       id: org.id,
       handle: to_string(org.handle),
@@ -303,9 +451,68 @@ defmodule FaciqorGrpc.Services.IdentityService do
       tax_id: org.tax_id || "",
       vat_id: org.vat_id || "",
       contact_email: if(org.contact_email, do: to_string(org.contact_email), else: ""),
-      deleted_at: if(org.deleted_at, do: DateTime.to_iso8601(org.deleted_at), else: nil)
+      deleted_at: if(org.deleted_at, do: DateTime.to_iso8601(org.deleted_at), else: nil),
+      logo_url: logo_url,
+      logo_variants: logo_variants
     }
   end
+
+  defp resolve_media_urls(blob_id) when is_binary(blob_id) do
+    case Faciqor.Media.get_storage_blob(blob_id, authorize?: false) do
+      {:ok, blob} ->
+        standard_url =
+          case blob.variants["512"] do
+            key when is_binary(key) -> Faciqor.Media.Storage.public_url(key)
+            _ -> Faciqor.Media.Storage.public_url(blob.key)
+          end
+
+        variants = %V1.MediaVariants{
+          size_64: if(key = blob.variants["64"], do: Faciqor.Media.Storage.public_url(key), else: nil),
+          size_128: if(key = blob.variants["128"], do: Faciqor.Media.Storage.public_url(key), else: nil),
+          size_256: if(key = blob.variants["256"], do: Faciqor.Media.Storage.public_url(key), else: nil),
+          size_512: if(key = blob.variants["512"], do: Faciqor.Media.Storage.public_url(key), else: nil)
+        }
+
+        {standard_url, variants}
+
+      _ ->
+        {nil, nil}
+    end
+  end
+
+  defp resolve_media_urls(_), do: {nil, nil}
+
+  defp validate_upload_request!(byte_size, content_type) do
+    if byte_size && byte_size > 5 * 1024 * 1024 do
+      raise GRPC.RPCError,
+        status: GRPC.Status.invalid_argument(),
+        message: "File size exceeds maximum allowed size of 5MB"
+    end
+
+    if content_type not in ["image/jpeg", "image/png", "image/webp"] do
+      raise GRPC.RPCError,
+        status: GRPC.Status.invalid_argument(),
+        message: "Unsupported content type: #{content_type}. Allowed: image/jpeg, image/png, image/webp"
+    end
+  end
+
+  defp verify_org_owner!(org, actor_id) do
+    is_owner? =
+      Enum.any?(org.memberships || [], fn m ->
+        m.user_id == actor_id and m.role == :owner
+      end)
+
+    unless is_owner? do
+      raise GRPC.RPCError,
+        status: GRPC.Status.permission_denied(),
+        message: "Only organization owners can modify the organization logo"
+    end
+  end
+
+  defp extension_for_mime("image/jpeg"), do: "jpg"
+  defp extension_for_mime("image/png"), do: "png"
+  defp extension_for_mime("image/webp"), do: "webp"
+  defp extension_for_mime(_), do: "bin"
 
   defp from_proto_focus!(:ORGANIZATION_FOCUS_PROPERTY_OWNER), do: :property_owner
   defp from_proto_focus!(:ORGANIZATION_FOCUS_PROPERTY_MANAGER), do: :property_manager

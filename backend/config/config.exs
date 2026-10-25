@@ -2,10 +2,16 @@ import Config
 
 config :faciqor,
   ash_domains: [
-    Faciqor.Accounts
+    Faciqor.Accounts,
+    Faciqor.Media
   ],
   ecto_repos: [Faciqor.Repo],
   generators: [timestamp_type: :utc_datetime_usec]
+
+config :faciqor, :media,
+  public_bucket: "faciqor-public",
+  vault_bucket: "faciqor-vault",
+  public_base_url: "http://localhost:8333/faciqor-public"
 
 config :ash,
   default_string_length_count: :codepoints

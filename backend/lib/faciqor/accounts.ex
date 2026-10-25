@@ -123,4 +123,48 @@ defmodule Faciqor.Accounts do
   end
 
   defp valid_uuid?(_), do: false
+
+  @doc """
+  Sets the avatar for a user.
+  """
+  def set_user_avatar(user, blob_id, opts \\ []) do
+    actor = Keyword.get(opts, :actor, user)
+
+    user
+    |> Ash.Changeset.for_update(:set_avatar, %{blob_id: blob_id}, actor: actor)
+    |> Ash.update(actor: actor)
+  end
+
+  @doc """
+  Removes the avatar for a user.
+  """
+  def remove_user_avatar(user, opts \\ []) do
+    actor = Keyword.get(opts, :actor, user)
+
+    user
+    |> Ash.Changeset.for_update(:remove_avatar, %{}, actor: actor)
+    |> Ash.update(actor: actor)
+  end
+
+  @doc """
+  Sets the logo for an organization.
+  """
+  def set_organization_logo(org, blob_id, opts \\ []) do
+    actor = Keyword.fetch!(opts, :actor)
+
+    org
+    |> Ash.Changeset.for_update(:set_logo, %{blob_id: blob_id}, actor: actor)
+    |> Ash.update(actor: actor)
+  end
+
+  @doc """
+  Removes the logo for an organization.
+  """
+  def remove_organization_logo(org, opts \\ []) do
+    actor = Keyword.fetch!(opts, :actor)
+
+    org
+    |> Ash.Changeset.for_update(:remove_logo, %{}, actor: actor)
+    |> Ash.update(actor: actor)
+  end
 end

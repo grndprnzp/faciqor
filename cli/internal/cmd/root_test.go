@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -19,6 +25,7 @@ import (
 
 type mockIdentityClient struct {
 	unverified bool
+	uploadURL  string
 	profile    *v1.UserProfileResponse
 	orgs       map[string]*v1.OrganizationResponse
 }
@@ -226,6 +233,80 @@ func (m *mockIdentityClient) SoftDeleteOrganization(ctx context.Context, in *v1.
 	return org, nil
 }
 
+func (m *mockIdentityClient) GetAvatarUploadTicket(ctx context.Context, in *v1.GetAvatarUploadTicketRequest, opts ...grpc.CallOption) (*v1.UploadTicketResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	uploadURL := "http://localhost:8333/faciqor-public/avatars/user-1/original.png"
+	if m.uploadURL != "" {
+		uploadURL = m.uploadURL
+	}
+	return &v1.UploadTicketResponse{
+		BlobId:     "blob-avatar-123",
+		UploadUrl:  uploadURL,
+		StorageKey: "avatars/user-1/original.png",
+	}, nil
+}
+
+func (m *mockIdentityClient) SetAvatar(ctx context.Context, in *v1.SetAvatarRequest, opts ...grpc.CallOption) (*v1.UserProfileResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	avatarURL := "http://localhost:8333/faciqor-public/avatars/user-1/512.webp"
+	m.profile.AvatarUrl = &avatarURL
+	return m.profile, nil
+}
+
+func (m *mockIdentityClient) RemoveAvatar(ctx context.Context, in *v1.RemoveAvatarRequest, opts ...grpc.CallOption) (*v1.UserProfileResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	m.profile.AvatarUrl = nil
+	m.profile.AvatarVariants = nil
+	return m.profile, nil
+}
+
+func (m *mockIdentityClient) GetOrganizationLogoUploadTicket(ctx context.Context, in *v1.GetOrganizationLogoUploadTicketRequest, opts ...grpc.CallOption) (*v1.UploadTicketResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	uploadURL := "http://localhost:8333/faciqor-public/logos/org-1/original.png"
+	if m.uploadURL != "" {
+		uploadURL = m.uploadURL
+	}
+	return &v1.UploadTicketResponse{
+		BlobId:     "blob-logo-123",
+		UploadUrl:  uploadURL,
+		StorageKey: "logos/org-1/original.png",
+	}, nil
+}
+
+func (m *mockIdentityClient) SetOrganizationLogo(ctx context.Context, in *v1.SetOrganizationLogoRequest, opts ...grpc.CallOption) (*v1.OrganizationResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	org, ok := m.orgs[in.IdOrHandle]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "organization not found")
+	}
+	logoURL := "http://localhost:8333/faciqor-public/logos/org-1/512.webp"
+	org.LogoUrl = &logoURL
+	return org, nil
+}
+
+func (m *mockIdentityClient) RemoveOrganizationLogo(ctx context.Context, in *v1.RemoveOrganizationLogoRequest, opts ...grpc.CallOption) (*v1.OrganizationResponse, error) {
+	if err := m.checkGate(); err != nil {
+		return nil, err
+	}
+	org, ok := m.orgs[in.IdOrHandle]
+	if !ok {
+		return nil, status.Error(codes.NotFound, "organization not found")
+	}
+	org.LogoUrl = nil
+	org.LogoVariants = nil
+	return org, nil
+}
+
 func runCLI(t *testing.T, mock *mockIdentityClient, configPath string, args ...string) (string, error) {
 	t.Helper()
 	factory := func(endpoint, token string) (v1.IdentityServiceClient, func() error, error) {
@@ -376,5 +457,111 @@ func TestProfileAndTokenCommands(t *testing.T) {
 	}
 	if !strings.Contains(out, "erfolgreich widerrufen") {
 		t.Errorf("expected success message in output, got: %s", out)
+	}
+}
+
+func createTestPNG(t *testing.T, w, h int) string {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(x % 256), G: uint8(y % 256), B: 128, A: 255})
+		}
+	}
+	f, err := os.CreateTemp(t.TempDir(), "test-*.png")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer f.Close()
+	if err := png.Encode(f, img); err != nil {
+		t.Fatalf("failed to encode test png: %v", err)
+	}
+	return f.Name()
+}
+
+func TestAvatarAndLogoCommands(t *testing.T) {
+	mock := newMockClient(false)
+	tmpConfig := filepath.Join(t.TempDir(), "config.yaml")
+
+	// Start test HTTP server to mock S3 upload
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	mock.uploadURL = srv.URL + "/upload"
+
+	validImage := createTestPNG(t, 512, 512)
+	smallImage := createTestPNG(t, 256, 256)
+	nonSquareImage := createTestPNG(t, 512, 600)
+
+	// 1. Validation failure: small image
+	_, err := runCLI(t, mock, tmpConfig, "profile", "avatar", "set", smallImage)
+	if err == nil || !strings.Contains(err.Error(), "at least 512x512px") {
+		t.Fatalf("expected 512px error, got: %v", err)
+	}
+
+	// 2. Validation failure: non-square image
+	_, err = runCLI(t, mock, tmpConfig, "profile", "avatar", "set", nonSquareImage)
+	if err == nil || !strings.Contains(err.Error(), "image must be square") {
+		t.Fatalf("expected square error, got: %v", err)
+	}
+
+	// 3. Avatar set success
+	out, err := runCLI(t, mock, tmpConfig, "profile", "avatar", "set", validImage)
+	if err != nil {
+		t.Fatalf("avatar set failed: %v", err)
+	}
+	if !strings.Contains(out, "Avatar erfolgreich aktualisiert") {
+		t.Errorf("expected success message in output, got: %s", out)
+	}
+	if mock.profile.AvatarUrl == nil {
+		t.Errorf("expected mock profile avatar URL to be set")
+	}
+
+	// 4. Avatar remove success
+	out, err = runCLI(t, mock, tmpConfig, "profile", "avatar", "remove")
+	if err != nil {
+		t.Fatalf("avatar remove failed: %v", err)
+	}
+	if !strings.Contains(out, "Avatar erfolgreich entfernt") {
+		t.Errorf("expected removal message in output, got: %s", out)
+	}
+	if mock.profile.AvatarUrl != nil {
+		t.Errorf("expected mock profile avatar URL to be nil")
+	}
+
+	// 5. Create an organization to test logo
+	_, err = runCLI(t, mock, tmpConfig, "org", "create", "--handle", "logo-test-org", "--focus", "manager")
+	if err != nil {
+		t.Fatalf("org create failed: %v", err)
+	}
+
+	// 6. Organization logo set success
+	out, err = runCLI(t, mock, tmpConfig, "org", "logo", "set", "logo-test-org", validImage)
+	if err != nil {
+		t.Fatalf("org logo set failed: %v", err)
+	}
+	if !strings.Contains(out, "Firmenlogo erfolgreich aktualisiert") {
+		t.Errorf("expected logo success message in output, got: %s", out)
+	}
+	if mock.orgs["logo-test-org"].LogoUrl == nil {
+		t.Errorf("expected org logo URL to be set")
+	}
+
+	// 7. Organization logo remove success
+	out, err = runCLI(t, mock, tmpConfig, "org", "logo", "remove", "logo-test-org")
+	if err != nil {
+		t.Fatalf("org logo remove failed: %v", err)
+	}
+	if !strings.Contains(out, "Firmenlogo erfolgreich entfernt") {
+		t.Errorf("expected logo removal message in output, got: %s", out)
+	}
+	if mock.orgs["logo-test-org"].LogoUrl != nil {
+		t.Errorf("expected org logo URL to be nil")
 	}
 }

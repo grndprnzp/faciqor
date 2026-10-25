@@ -16,7 +16,21 @@ defmodule Faciqor.Application do
     ]
 
     opts = [strategy: :one_for_one, name: Faciqor.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, pid} ->
+        if Application.get_env(:grpc, :start_server, Mix.env() != :test) do
+          Task.start(fn ->
+            Process.sleep(200)
+            Faciqor.Media.Storage.ensure_buckets()
+          end)
+        end
+
+        {:ok, pid}
+
+      other ->
+        other
+    end
   end
 
   @impl true

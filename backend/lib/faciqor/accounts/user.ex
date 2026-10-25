@@ -153,6 +153,10 @@ defmodule Faciqor.Accounts.User do
       public? true
     end
 
+    attribute :avatar_blob_id, :uuid do
+      public? true
+    end
+
     create_timestamp :inserted_at
     update_timestamp :updated_at
   end
@@ -168,6 +172,11 @@ defmodule Faciqor.Accounts.User do
     has_many :organizations, Faciqor.Accounts.Organization, through: [:memberships, :organization]
     has_many :api_tokens, Faciqor.Accounts.ApiToken
     has_many :identities, Faciqor.Accounts.UserIdentity
+
+    belongs_to :avatar_blob, Faciqor.Media.StorageBlob do
+      allow_nil? true
+      attribute_writable? true
+    end
   end
 
   actions do
@@ -241,6 +250,44 @@ defmodule Faciqor.Accounts.User do
     update :update_profile do
       accept [:handle, :display_name, :first_name, :last_name, :phone, :timezone, :locale]
       require_atomic? false
+    end
+
+    update :set_avatar do
+      require_atomic? false
+      argument :blob_id, :uuid, allow_nil?: false
+
+      change fn changeset, _context ->
+        old_blob_id = Ash.Changeset.get_attribute(changeset, :avatar_blob_id)
+        new_blob_id = Ash.Changeset.get_argument(changeset, :blob_id)
+
+        changeset
+        |> Ash.Changeset.change_attribute(:avatar_blob_id, new_blob_id)
+        |> Ash.Changeset.after_action(fn _changeset, updated_user ->
+          if old_blob_id && old_blob_id != new_blob_id do
+            Faciqor.Media.StorageBlob.cleanup_blob(old_blob_id)
+          end
+
+          {:ok, updated_user}
+        end)
+      end
+    end
+
+    update :remove_avatar do
+      require_atomic? false
+
+      change fn changeset, _context ->
+        old_blob_id = Ash.Changeset.get_attribute(changeset, :avatar_blob_id)
+
+        changeset
+        |> Ash.Changeset.change_attribute(:avatar_blob_id, nil)
+        |> Ash.Changeset.after_action(fn _changeset, updated_user ->
+          if old_blob_id do
+            Faciqor.Media.StorageBlob.cleanup_blob(old_blob_id)
+          end
+
+          {:ok, updated_user}
+        end)
+      end
     end
 
     update :change_password do

@@ -61,6 +61,8 @@ defmodule Faciqor.Accounts.Organization do
       constraints one_of: [:manual_by_owner, :orphaned_by_last_owner]
     end
 
+    attribute :logo_blob_id, :uuid, public?: true
+
     create_timestamp :inserted_at
     update_timestamp :updated_at
   end
@@ -68,6 +70,11 @@ defmodule Faciqor.Accounts.Organization do
   relationships do
     has_many :memberships, Faciqor.Accounts.OrganizationMembership
     has_many :users, Faciqor.Accounts.User, through: [:memberships, :user]
+
+    belongs_to :logo_blob, Faciqor.Media.StorageBlob do
+      allow_nil? true
+      attribute_writable? true
+    end
   end
 
   actions do
@@ -109,6 +116,44 @@ defmodule Faciqor.Accounts.Organization do
         :vat_id,
         :contact_email
       ]
+    end
+
+    update :set_logo do
+      require_atomic? false
+      argument :blob_id, :uuid, allow_nil?: false
+
+      change fn changeset, _context ->
+        old_blob_id = Ash.Changeset.get_attribute(changeset, :logo_blob_id)
+        new_blob_id = Ash.Changeset.get_argument(changeset, :blob_id)
+
+        changeset
+        |> Ash.Changeset.change_attribute(:logo_blob_id, new_blob_id)
+        |> Ash.Changeset.after_action(fn _changeset, updated_org ->
+          if old_blob_id && old_blob_id != new_blob_id do
+            Faciqor.Media.StorageBlob.cleanup_blob(old_blob_id)
+          end
+
+          {:ok, updated_org}
+        end)
+      end
+    end
+
+    update :remove_logo do
+      require_atomic? false
+
+      change fn changeset, _context ->
+        old_blob_id = Ash.Changeset.get_attribute(changeset, :logo_blob_id)
+
+        changeset
+        |> Ash.Changeset.change_attribute(:logo_blob_id, nil)
+        |> Ash.Changeset.after_action(fn _changeset, updated_org ->
+          if old_blob_id do
+            Faciqor.Media.StorageBlob.cleanup_blob(old_blob_id)
+          end
+
+          {:ok, updated_org}
+        end)
+      end
     end
 
     update :soft_delete do

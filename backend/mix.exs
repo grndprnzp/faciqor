@@ -63,7 +63,14 @@ defmodule Faciqor.MixProject do
 
       # gRPC & Protobuf
       {:grpc, "~> 0.8"},
-      {:protobuf, "~> 0.13"}
+      {:protobuf, "~> 0.13"},
+
+      # Media Processing & S3 Storage
+      {:image, "~> 0.54"},
+      {:ex_aws, "~> 2.5"},
+      {:ex_aws_s3, "~> 2.5"},
+      {:sweet_xml, "~> 0.7"},
+      {:hackney, "~> 4.0"}
     ]
   end
 
