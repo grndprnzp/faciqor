@@ -175,4 +175,40 @@ defmodule FaciqorWeb.LiveViewsTest do
                live(stranger_conn, ~p"/orgs/#{org.handle}/settings")
     end
   end
+
+  describe "7.2.5 Sign-Out & Escape Hatches" do
+    test "provides sign-out escape hatch on /verify-email-required", %{conn: conn} do
+      {:ok, user} =
+        User
+        |> Ash.Changeset.for_create(:register_with_password, %{
+          email: "must-verify@example.com",
+          password: "super_secure_password_123"
+        })
+        |> Ash.create()
+
+      conn = init_test_session(conn, %{"user_id" => user.id})
+      {:ok, view, html} = live(conn, ~p"/verify-email-required")
+
+      assert has_element?(view, "#verify-sign-out-btn")
+      assert html =~ "Abmelden"
+    end
+
+    test "provides sign-out escape hatch on /account/restore", %{conn: conn} do
+      {:ok, user} =
+        User
+        |> Ash.Changeset.for_create(:sign_in_with_magic_link, %{email: "restore-user@example.com"})
+        |> Ash.create()
+
+      {:ok, deleted_user} =
+        user
+        |> Ash.Changeset.for_update(:soft_delete_user, %{})
+        |> Ash.update(actor: user)
+
+      conn = init_test_session(conn, %{"user_id" => deleted_user.id})
+      {:ok, view, html} = live(conn, ~p"/account/restore")
+
+      assert has_element?(view, "#restore-sign-out-btn")
+      assert html =~ "Abmelden"
+    end
+  end
 end

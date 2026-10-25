@@ -48,7 +48,12 @@ defmodule FaciqorWeb.LiveUserAuth do
         {:halt, redirect(assign(socket, :current_user, user), to: "/dashboard")}
 
       %Accounts.User{} = user ->
-        {:cont, assign(socket, :current_user, user)}
+        socket =
+          socket
+          |> assign(:current_user, user)
+          |> assign(:current_org, nil)
+
+        {:cont, socket}
     end
   end
 
@@ -61,7 +66,12 @@ defmodule FaciqorWeb.LiveUserAuth do
         {:halt, redirect(assign(socket, :current_user, user), to: "/dashboard")}
 
       %Accounts.User{} = user ->
-        {:cont, assign(socket, :current_user, user)}
+        socket =
+          socket
+          |> assign(:current_user, user)
+          |> assign(:current_org, nil)
+
+        {:cont, socket}
     end
   end
 

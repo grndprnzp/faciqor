@@ -38,10 +38,18 @@ defmodule FaciqorWeb.AccountRestoreLive do
           <%= if @current_user.purge_at, do: Calendar.strftime(@current_user.purge_at, "%d.%m.%Y %H:%M UTC"), else: "in 60 Tagen" %>
         </span>
       </p>
-      <div class="pt-2">
+      <div class="pt-2 flex items-center justify-between">
         <.button type="button" phx-click="restore_account">
           Konto &amp; zugehörige Organisationen jetzt wiederherstellen
         </.button>
+        <.link
+          href={~p"/sign-out"}
+          method="delete"
+          id="restore-sign-out-btn"
+          class="text-xs text-[var(--fq-color-text-muted)] hover:text-[var(--fq-status-danger)] hover:underline transition-colors"
+        >
+          Abmelden
+        </.link>
       </div>
     </div>
     """

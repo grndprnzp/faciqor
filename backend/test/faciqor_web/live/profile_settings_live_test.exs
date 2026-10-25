@@ -169,5 +169,14 @@ defmodule FaciqorWeb.ProfileSettingsLiveTest do
       revoked_token = Ash.get!(ApiToken, token.id, authorize?: false)
       assert revoked_token.revoked_at != nil
     end
+
+    test "renders sign-out button in header and profile session card", %{conn: conn} do
+      {:ok, view, html} = live(conn, ~p"/settings/profile")
+
+      assert has_element?(view, "#header-sign-out-btn")
+      assert has_element?(view, "#profile-sign-out-btn")
+      assert html =~ "7. Aktive Sitzung &amp; Abmeldung"
+      assert html =~ "Vom System abmelden"
+    end
   end
 end

@@ -62,10 +62,10 @@ defmodule FaciqorWeb.Layouts do
           <%!-- Multi-Tenant Organization Switcher --%>
           <div class="flex items-center gap-2" id="tenant-switcher">
             <span class="text-xs text-[var(--fq-color-text-muted)]">Mandant:</span>
-            <%= if @current_org do %>
+            <%= if assigns[:current_org] do %>
               <div class="inline-flex items-center gap-2 px-3 py-1 rounded-md border border-[var(--fq-color-border)] bg-[var(--fq-color-bg-muted)]">
-                <span class="fq-mono font-medium text-xs">@<%= @current_org.handle %></span>
-                <.status_badge status={org_role(@current_org, @current_user)} />
+                <span class="fq-mono font-medium text-xs">@<%= assigns[:current_org].handle %></span>
+                <.status_badge status={org_role(assigns[:current_org], @current_user)} />
               </div>
             <% else %>
               <span class="text-xs italic text-[var(--fq-color-text-muted)]">Keine Organisation gewählt</span>
@@ -79,14 +79,33 @@ defmodule FaciqorWeb.Layouts do
           </div>
         </div>
 
-        <nav class="flex items-center gap-4">
-          <a href={~p"/settings/profile"} class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-text-main)] flex items-center gap-2">
+        <nav class="flex items-center gap-3">
+          <a
+            href={~p"/settings/profile"}
+            class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-text-main)] flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[var(--fq-color-bg-muted)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+          >
             <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)] text-[var(--fq-color-text-main)] font-semibold text-[10px]">
               <%= user_initials(@current_user) %>
             </span>
             <span class="font-medium text-[var(--fq-color-text-main)]"><%= user_display(@current_user) %></span>
-            <span class="text-[var(--fq-color-text-muted)] text-[11px]">(Profil &amp; CLI)</span>
+            <span class="text-[var(--fq-color-text-muted)] text-[11px] hidden sm:inline">(Profil &amp; CLI)</span>
           </a>
+
+          <span class="h-4 w-px bg-[var(--fq-color-border)]" aria-hidden="true"></span>
+
+          <.link
+            href={~p"/sign-out"}
+            method="delete"
+            id="header-sign-out-btn"
+            class="text-xs font-medium text-[var(--fq-color-text-muted)] hover:text-[var(--fq-status-danger)] hover:bg-[#FEF2F2] px-2.5 py-1.5 rounded-md transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+            title="Vom System abmelden"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+              <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" />
+              <path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l2.47-2.47a.75.75 0 10-1.06-1.06l-3.75 3.75a.75.75 0 000 1.06l3.75 3.75a.75.75 0 101.06-1.06l-2.47-2.47H18.25A.75.75 0 0019 10z" clip-rule="evenodd" />
+            </svg>
+            <span>Abmelden</span>
+          </.link>
         </nav>
       </header>
 

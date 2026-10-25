@@ -17,6 +17,8 @@ defmodule FaciqorWeb.Router do
 
     auth_routes AuthController, Faciqor.Accounts.User
     sign_out_route AuthController
+    delete "/sign-out", AuthController, :sign_out
+    post "/sign-out", AuthController, :sign_out
 
     live_session :public,
       on_mount: [{FaciqorWeb.LiveUserAuth, :live_user_optional}] do

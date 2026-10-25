@@ -23,7 +23,8 @@ defmodule FaciqorWeb.AuthController do
     conn
     |> clear_session(:faciqor)
     |> delete_session("user_id")
-    |> put_flash(:info, "Erfolgreich abgemeldet.")
+    |> configure_session(drop: true)
+    |> put_flash(:info, "Sie wurden erfolgreich abgemeldet.")
     |> redirect(to: ~p"/sign-in")
   end
 end

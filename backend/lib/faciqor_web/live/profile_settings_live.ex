@@ -689,9 +689,45 @@ defmodule FaciqorWeb.ProfileSettingsLive do
         <% end %>
       </section>
 
-      <%!-- Card 7: Danger Zone (60-Day Soft Delete) --%>
+      <%!-- Card 7: Aktive Sitzung & Abmeldung --%>
+      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
+        <div>
+          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">7. Aktive Sitzung &amp; Abmeldung</h2>
+          <p class="text-xs text-[var(--fq-color-text-muted)]">
+            Sie sind aktuell im Faciqor Hub als <strong class="text-[var(--fq-color-text-main)]"><%= @current_user.email %></strong> angemeldet.
+          </p>
+        </div>
+
+        <div class="p-4 rounded-lg bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="text-xs font-semibold text-[var(--fq-color-text-main)] flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Aktive Browser-Sitzung</span>
+            </div>
+            <p class="text-xs text-[var(--fq-color-text-muted)]">
+              Beendet Ihre aktuelle Browser-Sitzung und widerruft temporäre Session-Cookies.
+            </p>
+          </div>
+          <div>
+            <.link
+              href={~p"/sign-out"}
+              method="delete"
+              id="profile-sign-out-btn"
+              class="inline-flex items-center justify-center gap-2 rounded-md px-4 font-medium transition-colors h-11 lg:h-9 text-sm whitespace-nowrap bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[#FEF2F2] hover:text-[#DC2626] hover:border-[#EF4444] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-current">
+                <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" />
+                <path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l2.47-2.47a.75.75 0 10-1.06-1.06l-3.75 3.75a.75.75 0 000 1.06l3.75 3.75a.75.75 0 101.06-1.06l-2.47-2.47H18.25A.75.75 0 0019 10z" clip-rule="evenodd" />
+              </svg>
+              <span>Vom System abmelden</span>
+            </.link>
+          </div>
+        </div>
+      </section>
+
+      <%!-- Card 8: Danger Zone (60-Day Soft Delete) --%>
       <section class="bg-[var(--fq-color-bg-surface)] border-2 border-[var(--fq-status-danger)] rounded-lg p-6 space-y-4">
-        <h2 class="text-base font-bold text-[#991B1B]">7. Gefahrenzone – Konto löschen (60-Tage-Soft-Delete)</h2>
+        <h2 class="text-base font-bold text-[#991B1B]">8. Gefahrenzone – Konto löschen (60-Tage-Soft-Delete)</h2>
 
         <div :if={@orphaned_orgs != []} class="p-4 rounded-md bg-[#FEF2F2] border border-[#EF4444] text-xs text-[#991B1B] space-y-1">
           <p class="font-semibold">

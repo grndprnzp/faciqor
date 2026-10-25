@@ -22,10 +22,18 @@ defmodule FaciqorWeb.VerifyEmailRequiredLive do
         Die 14-tägige Kulanzfrist für Ihr Konto (<span class="fq-mono font-medium"><%= @current_user.email %></span>) ist abgelaufen.
         Bitte klicken Sie auf den Bestätigungslink in Ihrer E-Mail, um den Zugriff auf Faciqor Hub wieder freizuschalten.
       </p>
-      <div class="pt-2">
+      <div class="pt-2 flex items-center justify-between">
         <.button type="button" phx-click="resend_verification_email">
           Bestätigungs-E-Mail erneut senden
         </.button>
+        <.link
+          href={~p"/sign-out"}
+          method="delete"
+          id="verify-sign-out-btn"
+          class="text-xs text-[var(--fq-color-text-muted)] hover:text-[var(--fq-status-danger)] hover:underline transition-colors"
+        >
+          Abmelden
+        </.link>
       </div>
     </div>
     """
