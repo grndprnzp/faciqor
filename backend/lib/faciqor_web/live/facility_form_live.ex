@@ -410,298 +410,323 @@ defmodule FaciqorWeb.FacilityFormLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="space-y-6">
-      <%!-- Header --%>
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <div class="flex items-center gap-2">
-            <a
-              href={~p"/orgs/#{@org.handle}/facilities"}
-              class="text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
-            >
-              &larr; Zurück zur Objektliste
-            </a>
-          </div>
-          <h1 class="text-2xl font-bold text-[var(--fq-color-text-main)] mt-1">
-            <%= if @live_action == :new, do: "Neues Objekt anlegen", else: "Objekt #{@business_key_display}" %>
-          </h1>
-          <p class="text-sm text-[var(--fq-color-text-muted)]">
-            Mandant: <span class="fq-mono font-medium">@<%= @org.handle %></span> ·
-            Kartenanbieter: <span class="font-medium"><%= @map_config.provider %></span>
-          </p>
-        </div>
-      </div>
+    <div class="space-y-5">
+      <%!-- GitHub-Style Context Subhead with Breadcrumb --%>
+      <.gh_subhead>
+        <:title>
+          <span><%= if @live_action == :new, do: "Neues Objekt anlegen", else: "Objekt #{@business_key_display}" %></span>
+          <span :if={@title_preview != ""} class="text-sm font-normal text-[var(--fq-color-text-muted)]">
+            · <%= @title_preview %>
+          </span>
+        </:title>
+        <:description>
+          Mandant: <span class="fq-mono font-medium">@<%= @org.handle %></span> ·
+          Kartenanbieter: <span class="font-medium"><%= @map_config.provider %></span>
+        </:description>
+        <:actions>
+          <a
+            href={~p"/orgs/#{@org.handle}/facilities"}
+            class="inline-flex items-center justify-center rounded-md px-3 font-medium h-11 lg:h-9 text-xs bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)] transition-colors"
+          >
+            &larr; Zurück zur Objektliste
+          </a>
+        </:actions>
+      </.gh_subhead>
 
-      <%!-- Section 1: BusinessKey & Automatischer Objekt-Titel (Readonly) --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
-          1. Objekt-Identität &amp; automatisch generierter Titel
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <.input
-              id="facility-business-key"
-              name="business_key"
-              label={if @live_action == :new, do: "BusinessKey (Vorschau aus Nummernkreis)", else: "BusinessKey (Unveränderlich)"}
-              monospace={true}
-              readonly={true}
-              value={@business_key_display}
-            />
-          </div>
-          <div class="md:col-span-2">
-            <.input
-              id="facility-title-preview"
-              name="title"
-              label="Objekt-Titel (wird automatisch aus den Teiladressen gebildet)"
-              readonly={true}
-              placeholder="Wird nach Hinzufügen der Adressen automatisch berechnet..."
-              value={@title_preview}
-            />
-          </div>
-        </div>
-      </section>
-
-      <%!-- Section 2: Adress-Suche, Bereichsexpansion & Teiladressen --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
-            2. Adressen, Hausnummern-Bereiche &amp; Eckgrundstücke
-          </h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Unterstützt Einzeladressen, Hausnummern-Bereiche (<code class="fq-mono">Hauptstraße 10-13, Berlin</code>),
-            Buchstabensuffixe (<code class="fq-mono">Gartenweg 10a-c, Berlin</code>), unterbrochene Listen
-            (<code class="fq-mono">Main Street 123, 125, 127</code>) sowie Eckgrundstücke (<code class="fq-mono">Lauterberger Straße 32 / Walkenrieder Straße 4, Berlin</code>).
-          </p>
-        </div>
-
-        <form
-          :if={@can_write?}
-          id="facility-address-search-form"
-          phx-submit="add_address_query"
-          class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end"
-        >
-          <div class="md:col-span-7">
-            <.input
-              id="facility-address-query"
-              name="query"
-              label="Adresse, Bereich oder Eckgrundstück eingeben"
-              placeholder="z. B. Hauptstraße 10-13, 10115 Berlin"
-              value={@address_query}
-            />
-          </div>
-
-          <div class="md:col-span-3 space-y-1">
-            <label for="facility-parity-filter" class="block text-xs font-medium text-[var(--fq-color-text-main)]">
-              Hausnummern-Filter (bei Bereichen)
-            </label>
-            <select
-              id="facility-parity-filter"
-              name="parity_filter"
-              class="w-full rounded-md border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-surface)] px-3 text-sm text-[var(--fq-color-text-main)] h-11 lg:h-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
-            >
-              <option value="all" selected={@parity_filter == "all"}>Alle Hausnummern</option>
-              <option value="even" selected={@parity_filter == "even"}>Nur gerade (z. B. 10, 12, 14)</option>
-              <option value="odd" selected={@parity_filter == "odd"}>Nur ungerade (z. B. 11, 13, 15)</option>
-            </select>
-          </div>
-
-          <div class="md:col-span-2">
-            <.button type="submit" class="w-full">
-              Adresse hinzufügen
-            </.button>
-          </div>
-        </form>
-
-        <%!-- Mehrfachtreffer-Hinweis & Auswahl --%>
-        <div
-          :if={@disambiguations != []}
-          id="disambiguation-panel"
-          class="bg-[#FFFBEB] border border-[#F59E0B] rounded-lg p-4 space-y-3"
-        >
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-[#92400E]">
-              Mehrfachtreffer in der Geo-Suche gefunden – Bitte wählen Sie das gewünschte Ergebnis:
-            </span>
-          </div>
-
-          <div :for={{dis, dis_idx} <- Enum.with_index(@disambiguations)} class="bg-white border border-[#FCD34D] rounded p-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-semibold text-[var(--fq-color-text-main)]">
-                Suchanfrage: <code class="fq-mono"><%= dis.item.query %></code>
+      <%!-- 2-Column GitHub Editor Layout (Main 8 Cols + Sticky Right Metadata Sidebar 4 Cols) --%>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <%!-- Main Left Column (Address Search/Table + Geofence Map) --%>
+        <div class="lg:col-span-8 space-y-6">
+          <%!-- Box 1: Adress-Suche, Bereichsexpansion & Teiladressen --%>
+          <.gh_box body_class="p-5 space-y-4">
+            <:header>
+              <span>Adressen, Hausnummern-Bereiche &amp; Eckgrundstücke</span>
+              <span class="px-1.5 py-0.5 rounded-full bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] fq-mono tabular-nums text-[11px] text-[var(--fq-color-text-muted)]">
+                <%= length(@addresses) %>
               </span>
-              <button
-                type="button"
-                phx-click="dismiss_disambiguation"
-                phx-value-dis-idx={dis_idx}
-                class="text-xs text-[var(--fq-color-text-muted)] hover:underline"
-              >
-                Verwerfen
-              </button>
-            </div>
+            </:header>
 
-            <div class="divide-y divide-[var(--fq-color-border)]">
-              <div
-                :for={{cand, cand_idx} <- Enum.with_index(dis.candidates)}
-                class="py-2 flex items-center justify-between gap-4"
-              >
-                <div>
-                  <div class="text-xs font-medium text-[var(--fq-color-text-main)]">
-                    <%= cand.formatted_label %>
-                  </div>
-                  <div class="text-[11px] fq-mono tabular-nums text-[var(--fq-color-text-muted)]">
-                    Lat: <%= Decimal.to_string(cand.latitude, :normal) %> · Lon: <%= Decimal.to_string(cand.longitude, :normal) %>
+            <p class="text-xs text-[var(--fq-color-text-muted)]">
+              Unterstützt Einzeladressen, Hausnummern-Bereiche (<code class="fq-mono">Hauptstraße 10-13, Berlin</code>),
+              Buchstabensuffixe (<code class="fq-mono">Gartenweg 10a-c, Berlin</code>), unterbrochene Listen
+              (<code class="fq-mono">Main Street 123, 125, 127</code>) sowie Eckgrundstücke (<code class="fq-mono">Lauterberger Straße 32 / Walkenrieder Straße 4, Berlin</code>).
+            </p>
+
+            <form
+              :if={@can_write?}
+              id="facility-address-search-form"
+              phx-submit="add_address_query"
+              class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end pt-1"
+            >
+              <div class="md:col-span-7">
+                <.input
+                  id="facility-address-query"
+                  name="query"
+                  label="Adresse, Bereich oder Eckgrundstück eingeben"
+                  placeholder="z. B. Hauptstraße 10-13, 10115 Berlin"
+                  value={@address_query}
+                />
+              </div>
+
+              <div class="md:col-span-3 space-y-1">
+                <label for="facility-parity-filter" class="block text-sm font-medium text-[var(--fq-color-text-main)]">
+                  Hausnummern-Filter
+                </label>
+                <select
+                  id="facility-parity-filter"
+                  name="parity_filter"
+                  class="w-full rounded-md border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-surface)] px-3 text-sm text-[var(--fq-color-text-main)] h-11 lg:h-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]"
+                >
+                  <option value="all" selected={@parity_filter == "all"}>Alle Hausnummern</option>
+                  <option value="even" selected={@parity_filter == "even"}>Nur gerade (10, 12, ...)</option>
+                  <option value="odd" selected={@parity_filter == "odd"}>Nur ungerade (11, 13, ...)</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-2">
+                <.button type="submit" class="w-full">
+                  Hinzufügen
+                </.button>
+              </div>
+            </form>
+
+            <%!-- Mehrfachtreffer-Hinweis & Auswahl --%>
+            <div
+              :if={@disambiguations != []}
+              id="disambiguation-panel"
+              class="bg-[#FFFBEB] border border-[#F59E0B] rounded-lg p-4 space-y-3"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-[#92400E]">
+                  Mehrfachtreffer in der Geo-Suche gefunden – Bitte wählen Sie das gewünschte Ergebnis:
+                </span>
+              </div>
+
+              <div :for={{dis, dis_idx} <- Enum.with_index(@disambiguations)} class="bg-white border border-[#FCD34D] rounded p-3 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-[var(--fq-color-text-main)]">
+                    Suchanfrage: <code class="fq-mono"><%= dis.item.query %></code>
+                  </span>
+                  <button
+                    type="button"
+                    phx-click="dismiss_disambiguation"
+                    phx-value-dis-idx={dis_idx}
+                    class="text-xs text-[var(--fq-color-text-muted)] hover:underline"
+                  >
+                    Verwerfen
+                  </button>
+                </div>
+
+                <div class="divide-y divide-[var(--fq-color-border)]">
+                  <div
+                    :for={{cand, cand_idx} <- Enum.with_index(dis.candidates)}
+                    class="py-2 flex items-center justify-between gap-4"
+                  >
+                    <div>
+                      <div class="text-xs font-medium text-[var(--fq-color-text-main)]">
+                        <%= cand.formatted_label %>
+                      </div>
+                      <div class="text-[11px] fq-mono tabular-nums text-[var(--fq-color-text-muted)]">
+                        Lat: <%= Decimal.to_string(cand.latitude, :normal) %> · Lon: <%= Decimal.to_string(cand.longitude, :normal) %>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      id={"select-candidate-#{dis_idx}-#{cand_idx}"}
+                      phx-click="select_candidate"
+                      phx-value-dis-idx={dis_idx}
+                      phx-value-cand-idx={cand_idx}
+                      class="cursor-pointer px-3 py-1 rounded text-xs font-semibold bg-[var(--fq-color-primary)] text-white hover:bg-[var(--fq-color-primary-hover)]"
+                    >
+                      Auswählen
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  id={"select-candidate-#{dis_idx}-#{cand_idx}"}
-                  phx-click="select_candidate"
-                  phx-value-dis-idx={dis_idx}
-                  phx-value-cand-idx={cand_idx}
-                  class="cursor-pointer px-3 py-1 rounded text-xs font-semibold bg-[var(--fq-color-primary)] text-white hover:bg-[var(--fq-color-primary-hover)]"
-                >
-                  Auswählen
-                </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <%!-- Liste der erfassten Teiladressen --%>
-        <%= if @addresses == [] do %>
-          <div id="no-addresses-hint" class="p-4 rounded border border-dashed border-[var(--fq-color-border-strong)] text-center text-xs text-[var(--fq-color-text-muted)]">
-            Noch keine Adresse hinzugefügt. Geben Sie oben eine Adresse oder einen Bereich ein.
-          </div>
-        <% else %>
-          <.table id="facility-addresses-table" rows={Enum.with_index(@addresses)}>
-            <:col :let={{addr, _idx}} label="Straße">
-              <span class="font-medium"><%= addr.street %></span>
-            </:col>
-            <:col :let={{addr, _idx}} label="Hausnr.">
-              <span class="fq-mono tabular-nums font-semibold"><%= addr.house_number %></span>
-            </:col>
-            <:col :let={{addr, _idx}} label="PLZ & Ort">
-              <%= addr.postal_code %> <%= addr.city %> (<%= addr.country_code %>)
-            </:col>
-            <:col :let={{addr, _idx}} label="Breitengrad (Lat)">
-              <span class="fq-mono tabular-nums text-xs"><%= addr.latitude %></span>
-            </:col>
-            <:col :let={{addr, _idx}} label="Längengrad (Lon)">
-              <span class="fq-mono tabular-nums text-xs"><%= addr.longitude %></span>
-            </:col>
-            <:col :let={{addr, idx}} label="Rolle">
-              <%= if addr.is_primary do %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[var(--fq-color-primary-subtle)] text-[var(--fq-color-primary)]">
-                  Hauptadresse
-                </span>
-              <% else %>
-                <button
-                  :if={@can_write?}
-                  type="button"
-                  phx-click="set_primary_address"
-                  phx-value-index={idx}
-                  class="cursor-pointer text-xs text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-primary)] hover:underline"
-                >
-                  Als Hauptadresse setzen
-                </button>
-              <% end %>
-            </:col>
-            <:action :let={{_addr, idx}}>
-              <button
+            <%!-- Liste der erfassten Teiladressen --%>
+            <%= if @addresses == [] do %>
+              <div id="no-addresses-hint" class="p-6 rounded border border-dashed border-[var(--fq-color-border-strong)] text-center text-xs text-[var(--fq-color-text-muted)]">
+                Noch keine Adresse hinzugefügt. Geben Sie oben eine Adresse oder einen Bereich ein.
+              </div>
+            <% else %>
+              <.table id="facility-addresses-table" rows={Enum.with_index(@addresses)}>
+                <:col :let={{addr, _idx}} label="Straße">
+                  <span class="font-medium"><%= addr.street %></span>
+                </:col>
+                <:col :let={{addr, _idx}} label="Hausnr.">
+                  <span class="fq-mono tabular-nums font-semibold"><%= addr.house_number %></span>
+                </:col>
+                <:col :let={{addr, _idx}} label="PLZ & Ort">
+                  <%= addr.postal_code %> <%= addr.city %> (<%= addr.country_code %>)
+                </:col>
+                <:col :let={{addr, _idx}} label="Koordinaten (Lat / Lon)">
+                  <span class="fq-mono tabular-nums text-xs text-[var(--fq-color-text-muted)]">
+                    <%= addr.latitude %>, <%= addr.longitude %>
+                  </span>
+                </:col>
+                <:col :let={{addr, idx}} label="Rolle">
+                  <%= if addr.is_primary do %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[var(--fq-color-primary-subtle)] text-[var(--fq-color-primary)]">
+                      Hauptadresse
+                    </span>
+                  <% else %>
+                    <button
+                      :if={@can_write?}
+                      type="button"
+                      phx-click="set_primary_address"
+                      phx-value-index={idx}
+                      class="cursor-pointer text-xs text-[var(--fq-color-text-muted)] hover:text-[var(--fq-color-primary)] hover:underline"
+                    >
+                      Als Hauptadresse setzen
+                    </button>
+                  <% end %>
+                </:col>
+                <:action :let={{_addr, idx}}>
+                  <button
+                    :if={@can_write?}
+                    type="button"
+                    id={"remove-address-#{idx}"}
+                    phx-click="remove_address"
+                    phx-value-index={idx}
+                    class="cursor-pointer text-xs font-medium text-red-600 hover:underline"
+                  >
+                    Entfernen
+                  </button>
+                </:action>
+              </.table>
+            <% end %>
+          </.gh_box>
+
+          <%!-- Box 2: Kartenansicht & Geofence-Zone --%>
+          <.gh_box body_class="p-5 space-y-4">
+            <:header>
+              <span>Kartenansicht &amp; Geofence-Zone (PostGIS Polygon)</span>
+            </:header>
+            <:header_actions>
+              <form
                 :if={@can_write?}
-                type="button"
-                id={"remove-address-#{idx}"}
-                phx-click="remove_address"
-                phx-value-index={idx}
-                class="cursor-pointer text-xs font-medium text-red-600 hover:underline"
+                id="geofence-radius-form"
+                phx-change="update_geofence_radius"
+                class="flex items-center gap-3"
               >
-                Entfernen
-              </button>
-            </:action>
-          </.table>
-        <% end %>
-      </section>
+                <label for="geofence-radius-slider" class="text-xs font-medium text-[var(--fq-color-text-main)]">
+                  Radius:
+                  <span class="fq-mono tabular-nums font-bold text-[var(--fq-color-primary)]">
+                    <%= @geofence_radius_meters %>m
+                  </span>
+                </label>
+                <input
+                  id="geofence-radius-slider"
+                  type="range"
+                  name="radius"
+                  min="15"
+                  max="500"
+                  step="5"
+                  value={@geofence_radius_meters}
+                  class="w-32 accent-[var(--fq-color-primary)]"
+                />
+                <button
+                  :if={@custom_polygon?}
+                  type="button"
+                  phx-click="reset_geofence_polygon"
+                  class="cursor-pointer text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
+                >
+                  Standard-Polygon
+                </button>
+              </form>
+            </:header_actions>
 
-      <%!-- Section 3: Kartenansicht & Geofence-Zone --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div class="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
-              3. Kartenansicht &amp; Geofence-Zone (PostGIS Polygon)
-            </h2>
             <p class="text-xs text-[var(--fq-color-text-muted)]">
               Zeigt alle erfassten Teiladressen und die umschließende Geofence-Zone zur Positionsprüfung.
               Sie können den Puffer-Radius anpassen oder die Polygon-Eckpunkte direkt auf der Karte verschieben.
             </p>
-          </div>
 
-          <form
-            :if={@can_write?}
-            id="geofence-radius-form"
-            phx-change="update_geofence_radius"
-            class="flex items-center gap-3"
-          >
-            <label for="geofence-radius-slider" class="text-xs font-medium text-[var(--fq-color-text-main)]">
-              Geofence-Radius:
-              <span class="fq-mono tabular-nums font-bold text-[var(--fq-color-primary)]">
-                <%= @geofence_radius_meters %>m
-              </span>
-            </label>
-            <input
-              id="geofence-radius-slider"
-              type="range"
-              name="radius"
-              min="15"
-              max="500"
-              step="5"
-              value={@geofence_radius_meters}
-              class="w-36 accent-[var(--fq-color-primary)]"
-            />
-            <button
-              :if={@custom_polygon?}
-              type="button"
-              phx-click="reset_geofence_polygon"
-              class="cursor-pointer text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
+            <%!-- DOM-isolierter Karten-Container gemäß AGENTS.md § 4.4 --%>
+            <div
+              id="facility-map-wrapper"
+              phx-update="ignore"
+              phx-hook="FacilityMap"
+              data-tile-url={@map_config.tile_url}
+              data-attribution={@map_config.attribution}
+              data-provider={@map_config.provider}
+              data-editable={to_string(@can_write?)}
+              data-addresses={Jason.encode!(@addresses)}
+              data-polygon={Jason.encode!(@geofence_polygon)}
+              class="w-full h-96 rounded-lg border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-muted)] relative overflow-hidden"
             >
-              Auf Standard-Polygon zurücksetzen
-            </button>
-          </form>
+              <div id="facility-map-canvas" class="w-full h-full"></div>
+            </div>
+          </.gh_box>
         </div>
 
-        <%!-- DOM-isolierter Karten-Container gemäß AGENTS.md § 4.4 --%>
-        <div
-          id="facility-map-wrapper"
-          phx-update="ignore"
-          phx-hook="FacilityMap"
-          data-tile-url={@map_config.tile_url}
-          data-attribution={@map_config.attribution}
-          data-provider={@map_config.provider}
-          data-editable={to_string(@can_write?)}
-          data-addresses={Jason.encode!(@addresses)}
-          data-polygon={Jason.encode!(@geofence_polygon)}
-          class="w-full h-96 rounded-lg border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-muted)] relative overflow-hidden"
-        >
-          <div id="facility-map-canvas" class="w-full h-full"></div>
-        </div>
-      </section>
+        <%!-- Right Metadata & Action Sidebar (GitHub Sticky Sidebar) --%>
+        <aside class="lg:col-span-4 space-y-5 lg:sticky lg:top-6">
+          <.gh_box body_class="p-5 space-y-4">
+            <:header>
+              <span>Objekt-Identität &amp; Vorschau</span>
+            </:header>
 
-      <%!-- Footer Actions --%>
-      <div class="flex items-center justify-end gap-3">
-        <a
-          href={~p"/orgs/#{@org.handle}/facilities"}
-          class="inline-flex items-center justify-center rounded-md px-4 font-medium h-11 lg:h-9 text-sm bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)]"
-        >
-          Abbrechen
-        </a>
+            <.input
+              id="facility-business-key"
+              name="business_key"
+              label={if @live_action == :new, do: "BusinessKey (Vorschau)", else: "BusinessKey (Unveränderlich)"}
+              monospace={true}
+              readonly={true}
+              value={@business_key_display}
+            />
 
-        <.button
-          :if={@can_write?}
-          id="save-facility-btn"
-          type="button"
-          phx-click="save_facility"
-        >
-          <%= if @live_action == :new, do: "Objekt verbindlich anlegen", else: "Änderungen speichern" %>
-        </.button>
+            <.input
+              id="facility-title-preview"
+              name="title"
+              label="Automatischer Objekt-Titel"
+              readonly={true}
+              placeholder="Wird aus Adressen gebildet..."
+              value={@title_preview}
+            />
+
+            <div class="pt-3 border-t border-[var(--fq-color-border)] space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <span class="text-[var(--fq-color-text-muted)]">Teiladressen</span>
+                <span class="fq-mono tabular-nums font-semibold text-[var(--fq-color-text-main)]">
+                  <%= length(@addresses) %> Adresse(n)
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[var(--fq-color-text-muted)]">Geofence-Polygon</span>
+                <span class="fq-mono tabular-nums font-semibold text-[var(--fq-color-text-main)]">
+                  <%= length(@geofence_polygon) %> Eckpunkte (<%= @geofence_radius_meters %>m)
+                </span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-[var(--fq-color-text-muted)]">Kartenanbieter</span>
+                <span class="font-medium text-[var(--fq-color-text-main)]"><%= @map_config.provider %></span>
+              </div>
+            </div>
+
+            <:footer>
+              <div class="w-full flex flex-col sm:flex-row lg:flex-col gap-2">
+                <.button
+                  :if={@can_write?}
+                  id="save-facility-btn"
+                  type="button"
+                  phx-click="save_facility"
+                  class="w-full"
+                >
+                  <%= if @live_action == :new, do: "Objekt verbindlich anlegen", else: "Änderungen speichern" %>
+                </.button>
+
+                <a
+                  href={~p"/orgs/#{@org.handle}/facilities"}
+                  class="w-full inline-flex items-center justify-center rounded-md px-4 font-medium h-11 lg:h-9 text-sm bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)] transition-colors"
+                >
+                  Abbrechen
+                </a>
+              </div>
+            </:footer>
+          </.gh_box>
+        </aside>
       </div>
     </div>
     """

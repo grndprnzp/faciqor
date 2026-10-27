@@ -103,9 +103,9 @@ end
 * `backend/lib/faciqor_web/` ist die Präsentationsschicht (LiveView, HTML, Router, UI-Komponenten).
 * `backend/lib/faciqor_grpc/` ist der gRPC-Endpunkt-Adapter, der gRPC-Requests auf Ash-Aktionen mappt.
 
-### 4.2 Desktop-First UI & Design-System
-* Halte dich bei allen Templates an die Design-Vorgaben in `docs/ui_design_guidelines.md` und die Token-Definitionen in `backend/assets/css/app.css`.
-* Verwende zentrale Komponenten aus `FaciqorWeb.CoreComponents` (`<.button>`, `<.input>`, `<.table>`, `<.betrkv_badge>`, `<.proof_badge>`).
+### 4.2 Desktop-First UI & Design-System (GitHub-Inspirierte Layout-Architektur)
+* Halte dich bei allen Templates an die Design-Vorgaben und Seiten-Archetypen (2-stufiger Header mit Underline-Subnav, 2-Spalten-Dashboard/Editor, vertikale Settings-Sidebars) in `docs/ui_design_guidelines.md` und die Token-Definitionen in `backend/assets/css/app.css`.
+* Verwende zentrale Komponenten aus `FaciqorWeb.CoreComponents` (`<.button>`, `<.input>`, `<.table>`, `<.gh_subhead>`, `<.gh_box>`, `<.gh_danger_zone>`, `<.betrkv_badge>`, `<.proof_badge>`).
 * **Desktop-First Informationsdichte:** Desktop-Controls (`≥ 1024px`) haben eine Höhe von 36px (`lg:h-9`), auf Touch-Screens 44px (`h-11`).
 * **Zahlen & Geldbeträge:** Immer in Monospace mit Tabellenziffern formatieren (`fq-mono tabular-nums`).
 

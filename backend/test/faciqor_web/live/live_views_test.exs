@@ -211,4 +211,46 @@ defmodule FaciqorWeb.LiveViewsTest do
       assert html =~ "Abmelden"
     end
   end
+
+  describe "7.2.6 GitHub-Inspired Layout & Sidebar Navigation" do
+    test "renders 2-column dashboard sidebar, two-tier contextual subnav, and interactive org settings sidebar tabs",
+         %{conn: conn} do
+      {:ok, owner} =
+        User
+        |> Ash.Changeset.for_create(:sign_in_with_magic_link, %{email: "gh-layout-owner@example.com"})
+        |> Ash.create()
+
+      {:ok, org} =
+        Faciqor.Accounts.create_organization(
+          %{handle: "gh-org", primary_focus: :property_manager},
+          actor: owner
+        )
+
+      owner_conn = init_test_session(conn, %{"user_id" => owner.id})
+
+      # 1. Dashboard renders 2-column sidebar & context subnav
+      {:ok, dash_view, _dash_html} = live(owner_conn, ~p"/dashboard")
+      assert has_element?(dash_view, "#dashboard-sidebar")
+      assert has_element?(dash_view, "#context-subnav")
+      assert has_element?(dash_view, "#organizations-table")
+
+      # 2. Organization settings renders vertical sidebar and supports tab switching
+      {:ok, settings_view, _settings_html} = live(owner_conn, ~p"/orgs/#{org.handle}/settings")
+      assert has_element?(settings_view, "#org-settings-sidebar")
+      assert has_element?(settings_view, "#org-tab-general")
+      assert has_element?(settings_view, "#org-tab-number-ranges")
+      assert has_element?(settings_view, "#org-tab-geo")
+      assert has_element?(settings_view, "#org-tab-danger")
+
+      # Switch to number_ranges tab
+      settings_view
+      |> element("#org-tab-number-ranges")
+      |> render_click()
+
+      assert has_element?(
+               settings_view,
+               "#org-tab-number-ranges[class*='border-[var(--fq-color-primary)]']"
+             )
+    end
+  end
 end

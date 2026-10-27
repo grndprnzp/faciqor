@@ -208,10 +208,109 @@ defmodule FaciqorWeb.CoreComponents do
   end
 
   @doc """
-  Renders a high-density ERP data table.
+  Renders a GitHub-style section heading with bottom border (`Subhead`).
+  """
+  attr :id, :string, default: nil
+  attr :class, :string, default: nil
+  slot :title, required: true
+  slot :description
+  slot :actions
+
+  def gh_subhead(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "pb-3 mb-4 border-b border-[var(--fq-color-border)] flex items-center justify-between flex-wrap gap-3",
+        @class
+      ]}
+    >
+      <div class="space-y-0.5">
+        <h2 class="text-lg font-semibold text-[var(--fq-color-text-main)] flex items-center gap-2">
+          <%= render_slot(@title) %>
+        </h2>
+        <p :if={@description != []} class="text-xs text-[var(--fq-color-text-muted)]">
+          <%= render_slot(@description) %>
+        </p>
+      </div>
+      <div :if={@actions != []} class="flex items-center gap-2">
+        <%= render_slot(@actions) %>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a GitHub-style bordered Box container (`Box`) with optional muted header and footer bars.
+  """
+  attr :id, :string, default: nil
+  attr :class, :string, default: nil
+  attr :body_class, :string, default: "p-5"
+  slot :header
+  slot :header_actions
+  slot :inner_block, required: true
+  slot :footer
+
+  def gh_box(assigns) do
+    ~H"""
+    <section
+      id={@id}
+      class={[
+        "bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg overflow-hidden",
+        @class
+      ]}
+    >
+      <div
+        :if={@header != [] or @header_actions != []}
+        class="bg-[var(--fq-color-bg-muted)] px-4 py-3 border-b border-[var(--fq-color-border)] flex items-center justify-between flex-wrap gap-3"
+      >
+        <div class="text-xs font-semibold text-[var(--fq-color-text-main)] flex items-center gap-2">
+          <%= render_slot(@header) %>
+        </div>
+        <div :if={@header_actions != []} class="flex items-center gap-2">
+          <%= render_slot(@header_actions) %>
+        </div>
+      </div>
+      <div class={@body_class}>
+        <%= render_slot(@inner_block) %>
+      </div>
+      <div
+        :if={@footer != []}
+        class="bg-[var(--fq-color-bg-muted)] px-4 py-3 border-t border-[var(--fq-color-border)] flex items-center justify-between flex-wrap gap-3"
+      >
+        <%= render_slot(@footer) %>
+      </div>
+    </section>
+    """
+  end
+
+  @doc """
+  Renders a GitHub-style Danger Zone container (`Box--danger`) with divided action rows.
+  """
+  attr :id, :string, default: nil
+  attr :class, :string, default: nil
+  slot :inner_block, required: true
+
+  def gh_danger_zone(assigns) do
+    ~H"""
+    <section
+      id={@id}
+      class={[
+        "bg-[var(--fq-color-bg-surface)] border border-[var(--fq-status-danger)] rounded-lg divide-y divide-[var(--fq-color-border)] overflow-hidden",
+        @class
+      ]}
+    >
+      <%= render_slot(@inner_block) %>
+    </section>
+    """
+  end
+
+  @doc """
+  Renders a high-density ERP data table with optional GitHub-style Box header bar.
   """
   attr :id, :string, required: true
   attr :rows, :list, required: true
+  slot :header_bar
   slot :col, required: true do
     attr :label, :string
     attr :numeric, :boolean
@@ -221,25 +320,31 @@ defmodule FaciqorWeb.CoreComponents do
   def table(assigns) do
     ~H"""
     <div class="overflow-x-auto border border-[var(--fq-color-border)] rounded-lg bg-[var(--fq-color-bg-surface)]">
+      <div
+        :if={@header_bar != []}
+        class="bg-[var(--fq-color-bg-muted)] px-4 py-2.5 border-b border-[var(--fq-color-border)] flex items-center justify-between flex-wrap gap-3 text-xs"
+      >
+        <%= render_slot(@header_bar) %>
+      </div>
       <table class="min-w-full divide-y divide-[var(--fq-color-border)] text-sm">
         <thead class="bg-[var(--fq-color-bg-muted)]">
           <tr>
             <th
               :for={col <- @col}
               class={[
-                "px-4 py-2.5 font-medium text-[var(--fq-color-text-muted)]",
+                "px-4 py-2.5 font-medium text-[var(--fq-color-text-muted)] text-xs tracking-wide",
                 if(col[:numeric], do: "text-right", else: "text-left")
               ]}
             >
               <%= col[:label] %>
             </th>
-            <th :if={@action != []} class="px-4 py-2.5 text-right font-medium text-[var(--fq-color-text-muted)]">
+            <th :if={@action != []} class="px-4 py-2.5 text-right font-medium text-[var(--fq-color-text-muted)] text-xs tracking-wide">
               Aktion
             </th>
           </tr>
         </thead>
         <tbody id={@id} class="divide-y divide-[var(--fq-color-border)]">
-          <tr :for={row <- @rows} class="hover:bg-[var(--fq-color-bg-app)]">
+          <tr :for={row <- @rows} class="hover:bg-[var(--fq-color-bg-app)] transition-colors">
             <td
               :for={col <- @col}
               class={[

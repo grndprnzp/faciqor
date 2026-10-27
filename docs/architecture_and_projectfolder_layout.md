@@ -39,9 +39,11 @@ faciqor/
 │   ├── adr/                        # Architecture Decision Records
 │   │   ├── 0001-elixir-core.md
 │   │   ├── 0002-go-grpc-cli.md
-│   │   └── 0003-flutter-offline-sync.md
+│   │   ├── 0003-flutter-offline-sync.md
+│   │   └── 0004-media-processing-and-storage.md
 │   ├── requirements/               # Anforderungskataloge (001-milrestone.md, 002-facilities-and-locations.md, ...)
 │   ├── compliance/                 # BetrKV-, GEFMA- und GoBD-Spezifikationen
+│   ├── ui_design_guidelines.md     # Verbindliche UI/UX Design-Prinzipien & GitHub-inspirierte Layout-Architektur
 │   └── architecture_and_projectfolder_layout.md # DIESES DOKUMENT
 │
 ├── design/                         # UI/UX DESIGN SYSTEM & DESIGN TOKENS
@@ -207,7 +209,15 @@ Die Gestaltung aller Client-Frontends (**Faciqor Hub** in Phoenix LiveView sowie
 * Sämtliche Farbwerte, Typografie-Definitionen, Abstände (`spacing`), Radien und Klickflächenhöhen (`controlHeight`) sind in [tokens.json](file:///S:/src/faciqor/design/tokens.json) nach der W3C Design Tokens Community Group Spezifikation standardisiert.
 * Änderungen am Farbschema oder den visuellen Tokens müssen primär in `design/tokens.json` erfolgen und anschließend in die Client-Stylesheets bzw. Theme-Definitionen übertragen werden.
 
-### 7.2 Faciqor Hub Web Styling (`backend/assets/css/app.css`)
+### 7.2 Faciqor Hub Web Styling & Layout-Architektur (`backend/assets/css/app.css` & `docs/ui_design_guidelines.md`)
+* **GitHub-inspirierte Informationsarchitektur:** Die strukturelle Anordnung von Navigation, Listen, Formularen und Einstellungsseiten im **Faciqor Hub** folgt den Layout-Mustern von **GitHub.com** (detailliert in [`docs/ui_design_guidelines.md`](./ui_design_guidelines.md)):
+  * **Zweistufiger App-Header (`Layouts.app`):** Globale Top-Bar (Marken-Logo, `/` Kontext-Pfad mit interaktivem Mandanten-Switcher `#tenant-switcher`, `+ Objekt`-Schnellaktion, Benutzermenü) kombiniert mit einer horizontalen kontextuellen Underline-Subnavigation (`#context-subnav`).
+  * **Struktur-Komponenten (`CoreComponents`):** Wiederverwendbare Primitiven `<.gh_subhead>` (Sektionskopf mit Trennlinie), `<.gh_box>` (umrandeter Container mit abgesetzter Kopf-/Fußzeile), `<.gh_danger_zone>` (rot umrandeter Aktionsblock für Soft-Delete/Storno) sowie `<.table>` mit `:header_bar`-Statuszählern.
+  * **Seiten-Archetypen:**
+    * *Dashboard (`DashboardLive`):* 2-Spalten-Split mit linker Benutzer-/Mandanten-Sidebar (`#dashboard-sidebar`) und rechter Hauptspalte.
+    * *Listenansichten (`FacilityIndexLive`):* Kompakte Such-/Filter-Toolbar über einer Boxed Table mit Live-Zählern (`Aktiv` / `Archiviert`).
+    * *Editor-Ansichten (`FacilityFormLive`):* 2-Spalten-Layout (8 Spalten Hauptarbeitsbereich für Adressen & PostGIS-Geofence-Karte, 4 Spalten Sticky-Metadaten-Sidebar für BusinessKey, Auto-Titel und Speichern/Abbrechen).
+    * *Einstellungs-Seiten (`OrgSettingsLive`, `ProfileSettingsLive`):* Kontext-Header + vertikale Kategorien-Sidebar (`#org-settings-sidebar`, `#profile-settings-sidebar`) mit interaktiver Tab-Umschaltung (`switch_tab`).
 * **Token-Mapping & Tailwind CSS:** Die Tokens werden im CSS Root-Scope als CSS Custom Properties (`--fq-*`) definiert.
 * **Exklusive BetrKV-Farbsemantik:** Zur Vermeidung von Fehlbuchungen und Fehleinschätzungen sind BetrKV-Statusfarben strikt reserviert:
   * Umlagefähige Betriebskosten: `--fq-betrkv-allocatable-*` (Grüntöne)

@@ -215,5 +215,25 @@ defmodule FaciqorWeb.ProfileSettingsLiveTest do
       assert render(view) =~ "Avatar wurde entfernt"
       refute has_element?(view, "header img[alt='Avatar']")
     end
+
+    test "switches between GitHub-style sidebar tabs on /settings/profile", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/settings/profile")
+
+      assert has_element?(view, "#profile-settings-sidebar")
+      assert has_element?(view, "#profile-tab-profile")
+      assert has_element?(view, "#profile-tab-account")
+      assert has_element?(view, "#profile-tab-security")
+      assert has_element?(view, "#profile-tab-organizations")
+      assert has_element?(view, "#profile-tab-tokens")
+
+      view
+      |> element("#profile-tab-tokens")
+      |> render_click()
+
+      assert has_element?(
+               view,
+               "#profile-tab-tokens[class*='border-[var(--fq-color-primary)]']"
+             )
+    end
   end
 end

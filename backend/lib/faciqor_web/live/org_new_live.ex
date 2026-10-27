@@ -86,136 +86,153 @@ defmodule FaciqorWeb.OrgNewLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 class="text-2xl font-bold text-[var(--fq-color-text-main)]">Neue Organisation gründen</h1>
-        <p class="text-sm text-[var(--fq-color-text-muted)]">
+    <div class="max-w-3xl mx-auto space-y-6">
+      <.gh_subhead>
+        <:title>Neue Organisation gründen</:title>
+        <:description>
           Legen Sie einen neuen Mandanten an. Sie werden automatisch als <span class="font-medium">Owner</span> eingetragen.
-        </p>
-      </div>
-
-      <form phx-submit="create_org" class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-6">
-        <%!-- 1. Required: Handle --%>
-        <.input
-          id="org-handle"
-          name="handle"
-          label="Organisations-Handle"
-          prefix="@"
-          monospace={true}
-          placeholder="meine-hausverwaltung"
-          value={@handle}
-          errors={@errors}
-          required
-        />
-
-        <%!-- 2. Required: Primary Focus Radio Cards --%>
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-[var(--fq-color-text-main)]">
-            Tätigkeitsschwerpunkt (Pflichtauswahl)
-          </label>
-          <div class="grid grid-cols-1 gap-3" role="radiogroup">
-            <%!-- Option 1: Property Owner --%>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={to_string(@primary_focus == :property_owner)}
-              phx-click="select_focus"
-              phx-value-focus="property_owner"
-              class={[
-                "text-left p-4 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]",
-                if(@primary_focus == :property_owner,
-                  do: "border-[var(--fq-color-primary)] bg-[var(--fq-color-primary-subtle)]",
-                  else: "border-[var(--fq-color-border)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
-                )
-              ]}
-            >
-              <div class="font-semibold text-sm text-[var(--fq-color-text-main)]">
-                Eigentümer / Bestandshalter (:property_owner)
-              </div>
-              <div class="text-xs text-[var(--fq-color-text-muted)] mt-1">
-                „Ich verwalte eigene Liegenschaften oder WEG-Bestände im Direkt- oder Hybridmodell.“
-              </div>
-            </button>
-
-            <%!-- Option 2: Property Manager --%>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={to_string(@primary_focus == :property_manager)}
-              phx-click="select_focus"
-              phx-value-focus="property_manager"
-              class={[
-                "text-left p-4 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]",
-                if(@primary_focus == :property_manager,
-                  do: "border-[var(--fq-color-primary)] bg-[var(--fq-color-primary-subtle)]",
-                  else: "border-[var(--fq-color-border)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
-                )
-              ]}
-            >
-              <div class="font-semibold text-sm text-[var(--fq-color-text-main)]">
-                Hausverwaltung (:property_manager)
-              </div>
-              <div class="text-xs text-[var(--fq-color-text-muted)] mt-1">
-                „Ich verwalte Immobilienbestände für Dritte, prüfe Belege und übernehme Buchungsstapel.“
-              </div>
-            </button>
-
-            <%!-- Option 3: Service Provider --%>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={to_string(@primary_focus == :service_provider)}
-              phx-click="select_focus"
-              phx-value-focus="service_provider"
-              class={[
-                "text-left p-4 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]",
-                if(@primary_focus == :service_provider,
-                  do: "border-[var(--fq-color-primary)] bg-[var(--fq-color-primary-subtle)]",
-                  else: "border-[var(--fq-color-border)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
-                )
-              ]}
-            >
-              <div class="font-semibold text-sm text-[var(--fq-color-text-main)]">
-                Dienstleister / KMU (:service_provider)
-              </div>
-              <div class="text-xs text-[var(--fq-color-text-muted)] mt-1">
-                „Ich führe Hausmeister-, Reinigungs-, Grünflächen- oder Handwerksleistungen durch.“
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <%!-- 3. Optional Company Details Toggle --%>
-        <div>
-          <button
-            type="button"
-            phx-click="toggle_optional"
-            class="text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
+        </:description>
+        <:actions>
+          <a
+            href={~p"/dashboard"}
+            class="inline-flex items-center justify-center rounded-md px-3 font-medium h-11 lg:h-9 text-xs bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)] transition-colors"
           >
-            <%= if @show_optional, do: "▾ Formale Unternehmensdaten ausblenden", else: "▸ Formale Unternehmensdaten sofort ergänzen" %>
-          </button>
-        </div>
+            Abbrechen
+          </a>
+        </:actions>
+      </.gh_subhead>
 
-        <div :if={@show_optional} class="space-y-4 pt-2 border-t border-[var(--fq-color-border)]">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <.input id="org-display-name" name="display_name" label="Anzeigename" value={@display_name} />
-            <.input id="org-legal-name" name="legal_name" label="Offizieller Firmenname" value={@legal_name} />
-            <.input id="org-legal-form" name="legal_form" label="Rechtsform (z. B. GmbH, WEG)" value={@legal_form} />
-            <.input id="org-contact-email" name="contact_email" type="email" label="Rechnungs-/Kontakt-E-Mail" value={@contact_email} />
-            <.input id="org-street" name="street_address" label="Straße & Hausnummer" value={@street_address} />
-            <.input id="org-postal" name="postal_code" label="PLZ" value={@postal_code} />
-            <.input id="org-city" name="city" label="Ort" value={@city} />
-            <.input id="org-country" name="country_code" label="Land (ISO-2)" value={@country_code} />
-            <.input id="org-tax-id" name="tax_id" label="Steuernummer" monospace={true} value={@tax_id} />
-            <.input id="org-vat-id" name="vat_id" label="USt-IdNr." monospace={true} value={@vat_id} />
+      <form phx-submit="create_org" class="space-y-6">
+        <.gh_box body_class="p-6 space-y-6">
+          <:header>
+            <span>1. Mandanten-Identität &amp; Tätigkeitsschwerpunkt</span>
+          </:header>
+
+          <%!-- 1. Required: Handle --%>
+          <.input
+            id="org-handle"
+            name="handle"
+            label="Organisations-Handle"
+            prefix="@"
+            monospace={true}
+            placeholder="meine-hausverwaltung"
+            value={@handle}
+            errors={@errors}
+            required
+          />
+
+          <%!-- 2. Required: Primary Focus Radio Cards --%>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-[var(--fq-color-text-main)]">
+              Tätigkeitsschwerpunkt (Pflichtauswahl)
+            </label>
+            <div class="grid grid-cols-1 gap-3" role="radiogroup">
+              <%!-- Option 1: Property Owner --%>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={to_string(@primary_focus == :property_owner)}
+                phx-click="select_focus"
+                phx-value-focus="property_owner"
+                class={[
+                  "text-left p-4 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]",
+                  if(@primary_focus == :property_owner,
+                    do: "border-[var(--fq-color-primary)] bg-[var(--fq-color-primary-subtle)]",
+                    else: "border-[var(--fq-color-border)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
+                  )
+                ]}
+              >
+                <div class="font-semibold text-sm text-[var(--fq-color-text-main)]">
+                  Eigentümer / Bestandshalter (:property_owner)
+                </div>
+                <div class="text-xs text-[var(--fq-color-text-muted)] mt-1">
+                  „Ich verwalte eigene Liegenschaften oder WEG-Bestände im Direkt- oder Hybridmodell.“
+                </div>
+              </button>
+
+              <%!-- Option 2: Property Manager --%>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={to_string(@primary_focus == :property_manager)}
+                phx-click="select_focus"
+                phx-value-focus="property_manager"
+                class={[
+                  "text-left p-4 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]",
+                  if(@primary_focus == :property_manager,
+                    do: "border-[var(--fq-color-primary)] bg-[var(--fq-color-primary-subtle)]",
+                    else: "border-[var(--fq-color-border)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
+                  )
+                ]}
+              >
+                <div class="font-semibold text-sm text-[var(--fq-color-text-main)]">
+                  Hausverwaltung (:property_manager)
+                </div>
+                <div class="text-xs text-[var(--fq-color-text-muted)] mt-1">
+                  „Ich verwalte Immobilienbestände für Dritte, prüfe Belege und übernehme Buchungsstapel.“
+                </div>
+              </button>
+
+              <%!-- Option 3: Service Provider --%>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={to_string(@primary_focus == :service_provider)}
+                phx-click="select_focus"
+                phx-value-focus="service_provider"
+                class={[
+                  "text-left p-4 rounded-lg border transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB]",
+                  if(@primary_focus == :service_provider,
+                    do: "border-[var(--fq-color-primary)] bg-[var(--fq-color-primary-subtle)]",
+                    else: "border-[var(--fq-color-border)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
+                  )
+                ]}
+              >
+                <div class="font-semibold text-sm text-[var(--fq-color-text-main)]">
+                  Dienstleister / KMU (:service_provider)
+                </div>
+                <div class="text-xs text-[var(--fq-color-text-muted)] mt-1">
+                  „Ich führe Hausmeister-, Reinigungs-, Grünflächen- oder Handwerksleistungen durch.“
+                </div>
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div class="pt-2 flex justify-end">
-          <.button type="submit">
-            Organisation gründen
-          </.button>
-        </div>
+          <%!-- 3. Optional Company Details Toggle --%>
+          <div>
+            <button
+              type="button"
+              phx-click="toggle_optional"
+              class="text-xs font-medium text-[var(--fq-color-primary)] hover:underline cursor-pointer"
+            >
+              <%= if @show_optional, do: "▾ Formale Unternehmensdaten ausblenden", else: "▸ Formale Unternehmensdaten sofort ergänzen" %>
+            </button>
+          </div>
+
+          <div :if={@show_optional} class="space-y-4 pt-4 border-t border-[var(--fq-color-border)]">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <.input id="org-display-name" name="display_name" label="Anzeigename" value={@display_name} />
+              <.input id="org-legal-name" name="legal_name" label="Offizieller Firmenname" value={@legal_name} />
+              <.input id="org-legal-form" name="legal_form" label="Rechtsform (z. B. GmbH, WEG)" value={@legal_form} />
+              <.input id="org-contact-email" name="contact_email" type="email" label="Rechnungs-/Kontakt-E-Mail" value={@contact_email} />
+              <.input id="org-street" name="street_address" label="Straße & Hausnummer" value={@street_address} />
+              <.input id="org-postal" name="postal_code" label="PLZ" value={@postal_code} />
+              <.input id="org-city" name="city" label="Ort" value={@city} />
+              <.input id="org-country" name="country_code" label="Land (ISO-2)" value={@country_code} />
+              <.input id="org-tax-id" name="tax_id" label="Steuernummer" monospace={true} value={@tax_id} />
+              <.input id="org-vat-id" name="vat_id" label="USt-IdNr." monospace={true} value={@vat_id} />
+            </div>
+          </div>
+
+          <:footer>
+            <span class="text-xs text-[var(--fq-color-text-muted)]">
+              Nummernkreise und Kartenanbieter können direkt nach dem Anlegen konfiguriert werden.
+            </span>
+            <.button type="submit">
+              Organisation gründen
+            </.button>
+          </:footer>
+        </.gh_box>
       </form>
     </div>
     """

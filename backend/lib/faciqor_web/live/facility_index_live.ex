@@ -146,28 +146,28 @@ defmodule FaciqorWeb.FacilityIndexLive do
 
   @impl true
   def render(assigns) do
-    ~H"""
-    <div class="space-y-6">
-      <div class="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <div class="flex items-center gap-2">
-            <h1 class="text-2xl font-bold text-[var(--fq-color-text-main)]">
-              Objekte &amp; Liegenschaften
-            </h1>
-            <span class="fq-mono text-sm text-[var(--fq-color-text-muted)]">
-              (@<%= @org.handle %>)
-            </span>
-            <.status_badge status={@my_role} />
-          </div>
-          <p class="text-sm text-[var(--fq-color-text-muted)]">
-            Verwaltung aller Grundstücke, Mehrfach-Hausnummern, Eckgrundstücke und Geofence-Zonen
-          </p>
-        </div>
+    active_count = Enum.count(assigns.facilities, &is_nil(&1.archived_at))
+    archived_count = Enum.count(assigns.facilities, &(not is_nil(&1.archived_at)))
+    assigns = assign(assigns, active_count: active_count, archived_count: archived_count)
 
-        <div class="flex items-center gap-3">
+    ~H"""
+    <div class="space-y-5">
+      <%!-- GitHub-Style Context Subhead --%>
+      <.gh_subhead>
+        <:title>
+          <span>Objekte &amp; Liegenschaften</span>
+          <span class="fq-mono text-sm font-normal text-[var(--fq-color-text-muted)]">
+            (@<%= @org.handle %>)
+          </span>
+          <.status_badge status={@my_role} />
+        </:title>
+        <:description>
+          Verwaltung aller Grundstücke, Mehrfach-Hausnummern, Eckgrundstücke und Geofence-Zonen
+        </:description>
+        <:actions>
           <a
             href={~p"/orgs/#{@org.handle}/settings"}
-            class="inline-flex items-center justify-center rounded-md px-3 font-medium h-11 lg:h-9 text-xs bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)]"
+            class="inline-flex items-center justify-center rounded-md px-3 font-medium h-11 lg:h-9 text-xs bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)] transition-colors"
           >
             Nummernkreise &amp; Geo-Provider
           </a>
@@ -176,21 +176,21 @@ defmodule FaciqorWeb.FacilityIndexLive do
             :if={@can_write?}
             id="new-facility-btn"
             href={~p"/orgs/#{@org.handle}/facilities/new"}
-            class="inline-flex items-center justify-center rounded-md px-4 font-medium h-11 lg:h-9 text-sm bg-[var(--fq-color-primary)] text-white hover:bg-[var(--fq-color-primary-hover)]"
+            class="inline-flex items-center justify-center rounded-md px-4 font-medium h-11 lg:h-9 text-sm bg-[var(--fq-color-primary)] text-white hover:bg-[var(--fq-color-primary-hover)] transition-colors"
           >
             + Neues Objekt anlegen
           </a>
-        </div>
-      </div>
+        </:actions>
+      </.gh_subhead>
 
-      <%!-- Filter & Search Bar --%>
+      <%!-- GitHub-Style Filter & Search Toolbar --%>
       <form
         id="facilities-filter-form"
         phx-change="filter_facilities"
         phx-submit="filter_facilities"
-        class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-4 flex items-center justify-between flex-wrap gap-4"
+        class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-3 flex items-center justify-between flex-wrap gap-3"
       >
-        <div class="w-full sm:w-80">
+        <div class="w-full sm:w-96 flex-1 max-w-lg">
           <.input
             id="facilities-search-input"
             name="search"
@@ -199,26 +199,25 @@ defmodule FaciqorWeb.FacilityIndexLive do
           />
         </div>
 
-        <div class="flex items-center gap-2">
-          <input
-            id="facilities-include-archived"
-            type="checkbox"
-            name="include_archived"
-            value="true"
-            checked={@include_archived?}
-            class="h-4 w-4 rounded border-[var(--fq-color-border-strong)] text-[var(--fq-color-primary)]"
-          />
-          <label for="facilities-include-archived" class="text-xs font-medium text-[var(--fq-color-text-main)]">
-            Archivierte Objekte einblenden
-          </label>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)]">
+            <input
+              id="facilities-include-archived"
+              type="checkbox"
+              name="include_archived"
+              value="true"
+              checked={@include_archived?}
+              class="h-4 w-4 rounded border-[var(--fq-color-border-strong)] text-[var(--fq-color-primary)] cursor-pointer"
+            />
+            <label for="facilities-include-archived" class="text-xs font-medium text-[var(--fq-color-text-main)] cursor-pointer">
+              Archivierte Objekte einblenden
+            </label>
+          </div>
         </div>
       </form>
 
       <%= if @facilities == [] do %>
-        <div
-          id="facilities-empty-state"
-          class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-8 text-center space-y-3"
-        >
+        <.gh_box id="facilities-empty-state" body_class="p-10 text-center space-y-3">
           <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">
             Noch keine Objekte erfasst
           </h2>
@@ -233,9 +232,29 @@ defmodule FaciqorWeb.FacilityIndexLive do
               Erstes Objekt anlegen
             </a>
           </div>
-        </div>
+        </.gh_box>
       <% else %>
         <.table id="facilities-table" rows={@facilities}>
+          <:header_bar>
+            <div class="flex items-center gap-4">
+              <span class="inline-flex items-center gap-1.5 font-semibold text-[var(--fq-color-text-main)]">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span class="fq-mono tabular-nums"><%= @active_count %></span>
+                <span>Aktiv</span>
+              </span>
+              <span
+                :if={@include_archived? or @archived_count > 0}
+                class="inline-flex items-center gap-1.5 text-[var(--fq-color-text-muted)]"
+              >
+                <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                <span class="fq-mono tabular-nums"><%= @archived_count %></span>
+                <span>Archiviert</span>
+              </span>
+            </div>
+            <div class="text-[var(--fq-color-text-muted)] fq-mono text-[11px]">
+              Gesamt: <%= length(@facilities) %> Objekt(e)
+            </div>
+          </:header_bar>
           <:col :let={facility} label="BusinessKey">
             <span class="fq-mono tabular-nums font-bold text-xs text-[var(--fq-color-primary)]">
               <%= facility.business_key %>

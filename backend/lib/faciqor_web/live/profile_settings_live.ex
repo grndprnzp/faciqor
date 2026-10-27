@@ -40,6 +40,7 @@ defmodule FaciqorWeb.ProfileSettingsLive do
      {:ok,
       socket
       |> assign(:current_user, user)
+      |> assign(:active_tab, :profile)
       |> assign(:avatar_url, avatar_url)
       |> assign(:profile_form, profile_form)
       |> assign(:password_form, password_form)
@@ -57,6 +58,20 @@ defmodule FaciqorWeb.ProfileSettingsLive do
   end
 
   @impl true
+  def handle_event("switch_tab", %{"tab" => tab}, socket) do
+    active_tab =
+      case tab do
+        "profile" -> :profile
+        "account" -> :account
+        "security" -> :security
+        "organizations" -> :organizations
+        "tokens" -> :tokens
+        _ -> :profile
+      end
+
+    {:noreply, assign(socket, :active_tab, active_tab)}
+  end
+
   def handle_event("save_avatar", %{"data" => "data:image/" <> _ = data_url}, socket) do
     user = socket.assigns.current_user
     [_header, base64_content] = String.split(data_url, ",", parts: 2)
@@ -389,576 +404,726 @@ defmodule FaciqorWeb.ProfileSettingsLive do
   def render(assigns) do
     ~H"""
     <div class="space-y-6">
-      <div>
-        <h1 class="text-2xl font-bold text-[var(--fq-color-text-main)]">Benutzerprofil &amp; Sicherheit</h1>
-        <p class="text-sm text-[var(--fq-color-text-muted)]">
-          Verwalten Sie Ihre persönlichen Stammdaten, Anmeldedaten, CLI-Zugangstokens und Mandanten.
-        </p>
+      <%!-- GitHub-Style Personal Account Context Header --%>
+      <div class="pb-4 border-b border-[var(--fq-color-border)] flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-full overflow-hidden border border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-muted)] flex items-center justify-center shrink-0">
+            <%= if @avatar_url do %>
+              <img src={@avatar_url} alt="Avatar" class="w-full h-full object-cover" />
+            <% else %>
+              <span class="text-base font-bold text-[var(--fq-color-text-main)]">
+                <%= String.upcase(String.slice(@current_user.display_name || to_string(@current_user.handle) || "U", 0, 2)) %>
+              </span>
+            <% end %>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-xl font-bold text-[var(--fq-color-text-main)]">
+                <%= @current_user.display_name || "Benutzerprofil & Sicherheit" %>
+              </h1>
+              <span class="fq-mono text-sm text-[var(--fq-color-text-muted)]">
+                (@<%= @current_user.handle %>)
+              </span>
+            </div>
+            <p class="text-xs text-[var(--fq-color-text-muted)]">
+              Benutzerprofil &amp; Sicherheit · Persönliches Konto
+            </p>
+          </div>
+        </div>
+
+        <a
+          href={~p"/dashboard"}
+          class="inline-flex items-center justify-center rounded-md px-3.5 font-medium h-11 lg:h-9 text-xs bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[var(--fq-color-bg-muted)] transition-colors"
+        >
+          Zum Dashboard
+        </a>
       </div>
 
-      <%!-- Card: Avatar & Profilbild --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div class="flex items-start justify-between flex-wrap gap-4">
-          <div>
-            <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">Profilbild / Avatar</h2>
-            <p class="text-xs text-[var(--fq-color-text-muted)]">
-              Öffentlich sichtbar im Hub und bei Vor-Ort-Einsätzen. Quadratisch 1:1, mind. 512x512px, max. 5MB.
-            </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
-              1:1 Quadrat
-            </span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
-              Min. 512px
-            </span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
-              Max. 5MB
-            </span>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-6 pt-2">
-          <div class="relative group">
-            <div class="w-24 h-24 rounded-full overflow-hidden border-2 border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-muted)] flex items-center justify-center shadow-xs">
-              <%= if @avatar_url do %>
-                <img src={@avatar_url} alt="Avatar" class="w-full h-full object-cover" />
-              <% else %>
-                <span class="text-2xl font-bold text-[var(--fq-color-text-muted)]">
-                  <%= String.upcase(String.slice(@current_user.display_name || to_string(@current_user.handle) || "U", 0, 2)) %>
-                </span>
-              <% end %>
+      <%!-- GitHub 2-Column Settings Body (Left Vertical Sidebar + Right Active Category Panel) --%>
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <%!-- Left Vertical Navigation Sidebar --%>
+        <aside id="profile-settings-sidebar" class="lg:col-span-3 space-y-4">
+          <nav class="space-y-1" aria-label="Benutzer-Einstellungen">
+            <div class="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fq-color-text-muted)]">
+              Profil &amp; Konto
             </div>
-          </div>
-
-          <div class="space-y-2">
-            <div
-              id="avatar-cropper-trigger"
-              phx-hook="ImageCropper"
-              data-modal-id="avatar-crop-modal"
-              data-preview-id="avatar-crop-preview"
-              data-confirm-btn-id="avatar-crop-confirm"
-              data-cancel-btn-id="avatar-crop-cancel"
-              data-event="save_avatar"
+            <button
+              type="button"
+              id="profile-tab-profile"
+              phx-click="switch_tab"
+              phx-value-tab="profile"
+              class={[
+                "w-full text-left px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors cursor-pointer",
+                if(@active_tab == :profile,
+                  do: "bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-main)] font-semibold border-l-2 border-[var(--fq-color-primary)]",
+                  else: "text-[var(--fq-color-text-muted)] hover:bg-[var(--fq-color-bg-muted)]/60 hover:text-[var(--fq-color-text-main)]"
+                )
+              ]}
             >
-              <label class="cursor-pointer inline-flex items-center px-3 py-1.5 border border-[var(--fq-color-border-strong)] rounded text-xs font-semibold text-[var(--fq-color-text-main)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)] shadow-xs transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1.5">
-                  <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 013.25 3h13.5A2.25 2.25 0 0119 5.25v9.5A2.25 2.25 0 0116.75 17H3.25A2.25 2.25 0 011 14.75v-9.5zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 00.75-.75v-2.69l-2.22-2.22a.75.75 0 00-1.06 0l-1.91 1.91-3.47-3.47a.75.75 0 00-1.06 0L2.5 11.06zm10.75-4.31a1.25 1.25 0 11-2.5 0 1.25 1.25 0 012.5 0z" clip-rule="evenodd" />
-                </svg>
-                Avatar ändern
-                <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
-              </label>
+              <span>Öffentliches Profil</span>
+            </button>
+
+            <button
+              type="button"
+              id="profile-tab-account"
+              phx-click="switch_tab"
+              phx-value-tab="account"
+              class={[
+                "w-full text-left px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors cursor-pointer",
+                if(@active_tab == :account,
+                  do: "bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-main)] font-semibold border-l-2 border-[var(--fq-color-primary)]",
+                  else: "text-[var(--fq-color-text-muted)] hover:bg-[var(--fq-color-bg-muted)]/60 hover:text-[var(--fq-color-text-main)]"
+                )
+              ]}
+            >
+              <span>Konto &amp; E-Mail</span>
+            </button>
+
+            <button
+              type="button"
+              id="profile-tab-organizations"
+              phx-click="switch_tab"
+              phx-value-tab="organizations"
+              class={[
+                "w-full text-left px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors cursor-pointer",
+                if(@active_tab == :organizations,
+                  do: "bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-main)] font-semibold border-l-2 border-[var(--fq-color-primary)]",
+                  else: "text-[var(--fq-color-text-muted)] hover:bg-[var(--fq-color-bg-muted)]/60 hover:text-[var(--fq-color-text-main)]"
+                )
+              ]}
+            >
+              <span>Organisationen</span>
+              <span class="px-1.5 py-0.2 rounded-full bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] fq-mono tabular-nums text-[10px] text-[var(--fq-color-text-muted)]">
+                <%= length(@user_orgs) %>
+              </span>
+            </button>
+
+            <div class="pt-3 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fq-color-text-muted)]">
+              Zugang &amp; Sicherheit
             </div>
 
-            <%= if @avatar_url do %>
-              <div>
-                <button
-                  type="button"
-                  phx-click="remove_avatar"
-                  data-confirm="Möchten Sie Ihren Avatar wirklich entfernen?"
-                  class="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700 hover:underline flex items-center gap-1"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
-                    <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
-                  </svg>
-                  Avatar entfernen
-                </button>
+            <button
+              type="button"
+              id="profile-tab-security"
+              phx-click="switch_tab"
+              phx-value-tab="security"
+              class={[
+                "w-full text-left px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors cursor-pointer",
+                if(@active_tab == :security,
+                  do: "bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-main)] font-semibold border-l-2 border-[var(--fq-color-primary)]",
+                  else: "text-[var(--fq-color-text-muted)] hover:bg-[var(--fq-color-bg-muted)]/60 hover:text-[var(--fq-color-text-main)]"
+                )
+              ]}
+            >
+              <span>Passwort &amp; SSO</span>
+            </button>
+
+            <div class="pt-3 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--fq-color-text-muted)]">
+              Entwickler &amp; API
+            </div>
+
+            <button
+              type="button"
+              id="profile-tab-tokens"
+              phx-click="switch_tab"
+              phx-value-tab="tokens"
+              class={[
+                "w-full text-left px-3 py-2 rounded-md text-xs font-medium flex items-center justify-between transition-colors cursor-pointer",
+                if(@active_tab == :tokens,
+                  do: "bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-main)] font-semibold border-l-2 border-[var(--fq-color-primary)]",
+                  else: "text-[var(--fq-color-text-muted)] hover:bg-[var(--fq-color-bg-muted)]/60 hover:text-[var(--fq-color-text-main)]"
+                )
+              ]}
+            >
+              <span>CLI &amp; API-Tokens (PAT)</span>
+              <span class="px-1.5 py-0.2 rounded-full bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] fq-mono tabular-nums text-[10px] text-[var(--fq-color-text-muted)]">
+                <%= length(@api_tokens) %>
+              </span>
+            </button>
+          </nav>
+        </aside>
+
+        <%!-- Right Main Content Area --%>
+        <div class="lg:col-span-9 space-y-6">
+          <%!-- TAB 1 (:profile): Avatar & Persönliche Stammdaten --%>
+          <div class={[@active_tab != :profile && "hidden", "space-y-6"]}>
+            <.gh_subhead>
+              <:title>Profilbild / Avatar</:title>
+              <:description>
+                Öffentlich sichtbar im Hub und bei Vor-Ort-Einsätzen. Quadratisch 1:1, mind. 512x512px, max. 5MB.
+              </:description>
+              <:actions>
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--fq-color-bg-muted)] text-[var(--fq-color-text-muted)] border border-[var(--fq-color-border)]">
+                  1:1 · Min. 512px · Max. 5MB
+                </span>
+              </:actions>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-6 space-y-4">
+              <div class="flex items-center gap-6">
+                <div class="relative group">
+                  <div class="w-24 h-24 rounded-full overflow-hidden border-2 border-[var(--fq-color-border-strong)] bg-[var(--fq-color-bg-muted)] flex items-center justify-center shadow-xs">
+                    <%= if @avatar_url do %>
+                      <img src={@avatar_url} alt="Avatar" class="w-full h-full object-cover" />
+                    <% else %>
+                      <span class="text-2xl font-bold text-[var(--fq-color-text-muted)]">
+                        <%= String.upcase(String.slice(@current_user.display_name || to_string(@current_user.handle) || "U", 0, 2)) %>
+                      </span>
+                    <% end %>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <div
+                    id="avatar-cropper-trigger"
+                    phx-hook="ImageCropper"
+                    data-modal-id="avatar-crop-modal"
+                    data-preview-id="avatar-crop-preview"
+                    data-confirm-btn-id="avatar-crop-confirm"
+                    data-cancel-btn-id="avatar-crop-cancel"
+                    data-event="save_avatar"
+                  >
+                    <label class="cursor-pointer inline-flex items-center px-3 py-1.5 border border-[var(--fq-color-border-strong)] rounded text-xs font-semibold text-[var(--fq-color-text-main)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)] shadow-xs transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1.5">
+                        <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 013.25 3h13.5A2.25 2.25 0 0119 5.25v9.5A2.25 2.25 0 0116.75 17H3.25A2.25 2.25 0 011 14.75v-9.5zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 00.75-.75v-2.69l-2.22-2.22a.75.75 0 00-1.06 0l-1.91 1.91-3.47-3.47a.75.75 0 00-1.06 0L2.5 11.06zm10.75-4.31a1.25 1.25 0 11-2.5 0 1.25 1.25 0 012.5 0z" clip-rule="evenodd" />
+                      </svg>
+                      Avatar ändern
+                      <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+                    </label>
+                  </div>
+
+                  <%= if @avatar_url do %>
+                    <div>
+                      <button
+                        type="button"
+                        phx-click="remove_avatar"
+                        data-confirm="Möchten Sie Ihren Avatar wirklich entfernen?"
+                        class="cursor-pointer text-xs font-medium text-red-600 hover:text-red-700 hover:underline flex items-center gap-1"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3.5 h-3.5">
+                          <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd" />
+                        </svg>
+                        Avatar entfernen
+                      </button>
+                    </div>
+                  <% end %>
+                </div>
               </div>
-            <% end %>
-          </div>
-        </div>
 
-        <%!-- Modal für interaktiven Bildzuschnitt --%>
-        <div id="avatar-crop-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div class="bg-[var(--fq-color-bg-surface)] rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4 border border-[var(--fq-color-border)]">
-            <div class="flex items-center justify-between border-b border-[var(--fq-color-border)] pb-3">
-              <h3 class="text-sm font-bold text-[var(--fq-color-text-main)]">Avatar zuschneiden (1:1 Quadrat)</h3>
-              <span class="text-xs text-[var(--fq-color-text-muted)]">Maus/Touch zum Verschieben & Zoomen</span>
-            </div>
+              <%!-- Modal für interaktiven Bildzuschnitt --%>
+              <div id="avatar-crop-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+                <div class="bg-[var(--fq-color-bg-surface)] rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4 border border-[var(--fq-color-border)]">
+                  <div class="flex items-center justify-between border-b border-[var(--fq-color-border)] pb-3">
+                    <h3 class="text-sm font-bold text-[var(--fq-color-text-main)]">Avatar zuschneiden (1:1 Quadrat)</h3>
+                    <span class="text-xs text-[var(--fq-color-text-muted)]">Maus/Touch zum Verschieben &amp; Zoomen</span>
+                  </div>
 
-            <div id="avatar-crop-preview-wrapper" phx-update="ignore" class="w-full h-80 overflow-hidden bg-black rounded flex items-center justify-center relative">
-              <img id="avatar-crop-preview" src="" alt="Vorschau" class="max-h-full block" />
-            </div>
+                  <div id="avatar-crop-preview-wrapper" phx-update="ignore" class="w-full h-80 overflow-hidden bg-black rounded flex items-center justify-center relative">
+                    <img id="avatar-crop-preview" src="" alt="Vorschau" class="max-h-full block" />
+                  </div>
 
-            <div class="flex justify-end gap-3 pt-3 border-t border-[var(--fq-color-border)]">
-              <button
-                id="avatar-crop-cancel"
-                type="button"
-                class="cursor-pointer px-4 py-2 border border-[var(--fq-color-border)] rounded text-xs font-semibold text-[var(--fq-color-text-main)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
-              >
-                Abbrechen
-              </button>
-              <button
-                id="avatar-crop-confirm"
-                type="button"
-                class="cursor-pointer px-4 py-2 bg-[var(--fq-color-primary)] hover:bg-[var(--fq-color-primary-hover)] text-white rounded text-xs font-semibold shadow-xs"
-              >
-                Zuschneiden & Speichern
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <%!-- Card 1: User Profile & Stammdaten --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">1. Persönliche Stammdaten</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Diese Daten werden in Auftragsberichten, Revisionsprotokollen und zur Identifikation im Hub verwendet.
-          </p>
-        </div>
-
-        <.form :let={f} for={@profile_form} id="profile-form" phx-change="validate_profile" phx-submit="save_profile" class="space-y-4 max-w-2xl">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <.input
-              field={f[:handle]}
-              label="Benutzer-Handle"
-              prefix="@"
-              monospace={true}
-              phx-debounce="300"
-              required
-            />
-            <.input
-              field={f[:display_name]}
-              label="Anzeigename (z. B. Max Mustermann)"
-              placeholder="Vollständiger Name"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <.input
-              field={f[:first_name]}
-              label="Vorname"
-              placeholder="Vorname"
-            />
-            <.input
-              field={f[:last_name]}
-              label="Nachname"
-              placeholder="Nachname"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <.input
-              field={f[:phone]}
-              label="Telefon (Rückfragen)"
-              placeholder="+49 170 1234567"
-            />
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-[var(--fq-color-text-main)]">Zeitzone</label>
-              <select
-                name="user[timezone]"
-                class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
-              >
-                <option value="Europe/Berlin" selected={f[:timezone].value == "Europe/Berlin"}>Europe/Berlin (MEZ/MESZ)</option>
-                <option value="Europe/Vienna" selected={f[:timezone].value == "Europe/Vienna"}>Europe/Vienna</option>
-                <option value="Europe/Zurich" selected={f[:timezone].value == "Europe/Zurich"}>Europe/Zurich</option>
-                <option value="UTC" selected={f[:timezone].value == "UTC"}>UTC</option>
-              </select>
-            </div>
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-[var(--fq-color-text-main)]">Sprache</label>
-              <select
-                name="user[locale]"
-                class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
-              >
-                <option value="de" selected={f[:locale].value == "de"}>Deutsch (DE)</option>
-                <option value="en" selected={f[:locale].value == "en"}>English (EN)</option>
-              </select>
-            </div>
-          </div>
-
-          <.button type="submit">
-            Profil speichern
-          </.button>
-        </.form>
-      </section>
-
-      <%!-- Card 2: E-Mail & Verifizierung --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">2. Primäre E-Mail-Adresse</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Ihre E-Mail dient als primärer Anmeldeanker und für wichtige Systembenachrichtigungen.
-          </p>
-        </div>
-
-        <div class="max-w-lg space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-[var(--fq-color-text-main)]">Aktuelle Adresse</span>
-            <%= if @current_user.email_confirmed_at do %>
-              <.status_badge status={:verified} />
-            <% else %>
-              <.status_badge status={:unverified} />
-            <% end %>
-          </div>
-          <.input
-            id="profile-email-display"
-            name="email_display"
-            type="email"
-            value={to_string(@current_user.email)}
-            readonly={true}
-          />
-
-          <%= if @current_user.pending_email do %>
-            <div class="p-4 rounded-md bg-[#FFFBEB] border border-[#F59E0B] space-y-2">
-              <div class="flex items-center justify-between text-xs text-[#92400E]">
-                <span>Ausstehende Änderung auf: <strong class="fq-mono"><%= @current_user.pending_email %></strong></span>
-                <span class="font-semibold">Wartet auf Bestätigung</span>
+                  <div class="flex justify-end gap-3 pt-3 border-t border-[var(--fq-color-border)]">
+                    <button
+                      id="avatar-crop-cancel"
+                      type="button"
+                      class="cursor-pointer px-4 py-2 border border-[var(--fq-color-border)] rounded text-xs font-semibold text-[var(--fq-color-text-main)] bg-[var(--fq-color-bg-surface)] hover:bg-[var(--fq-color-bg-muted)]"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      id="avatar-crop-confirm"
+                      type="button"
+                      class="cursor-pointer px-4 py-2 bg-[var(--fq-color-primary)] hover:bg-[var(--fq-color-primary-hover)] text-white rounded text-xs font-semibold shadow-xs"
+                    >
+                      Zuschneiden &amp; Speichern
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div class="flex items-center gap-2 pt-1">
-                <.button type="button" phx-click="confirm_email_change">
-                  Jetzt bestätigen (Verifizieren)
-                </.button>
-                <.button type="button" variant="secondary" phx-click="cancel_email_change">
-                  Abbrechen
-                </.button>
-              </div>
-            </div>
-          <% else %>
-            <div>
-              <%= if @show_email_change_form do %>
-                <.form :let={ef} for={@email_change_form} id="email-change-form" phx-submit="request_email_change" class="space-y-3 pt-2">
+            </.gh_box>
+
+            <.gh_subhead>
+              <:title>1. Persönliche Stammdaten</:title>
+              <:description>
+                Diese Daten werden in Auftragsberichten, Revisionsprotokollen und zur Identifikation im Hub verwendet.
+              </:description>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-6">
+              <.form :let={f} for={@profile_form} id="profile-form" phx-change="validate_profile" phx-submit="save_profile" class="space-y-4 max-w-2xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <.input
-                    field={ef[:new_email]}
-                    type="email"
-                    label="Neue E-Mail-Adresse"
-                    placeholder="neue-adresse@example.com"
+                    field={f[:handle]}
+                    label="Benutzer-Handle"
+                    prefix="@"
+                    monospace={true}
+                    phx-debounce="300"
                     required
                   />
-                  <div class="flex items-center gap-2">
-                    <.button type="submit">
-                      Änderungslink anfordern
+                  <.input
+                    field={f[:display_name]}
+                    label="Anzeigename (z. B. Max Mustermann)"
+                    placeholder="Vollständiger Name"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <.input
+                    field={f[:first_name]}
+                    label="Vorname"
+                    placeholder="Vorname"
+                  />
+                  <.input
+                    field={f[:last_name]}
+                    label="Nachname"
+                    placeholder="Nachname"
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <.input
+                    field={f[:phone]}
+                    label="Telefon (Rückfragen)"
+                    placeholder="+49 170 1234567"
+                  />
+                  <div class="space-y-1">
+                    <label class="block text-sm font-medium text-[var(--fq-color-text-main)]">Zeitzone</label>
+                    <select
+                      name="user[timezone]"
+                      class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
+                    >
+                      <option value="Europe/Berlin" selected={f[:timezone].value == "Europe/Berlin"}>Europe/Berlin (MEZ/MESZ)</option>
+                      <option value="Europe/Vienna" selected={f[:timezone].value == "Europe/Vienna"}>Europe/Vienna</option>
+                      <option value="Europe/Zurich" selected={f[:timezone].value == "Europe/Zurich"}>Europe/Zurich</option>
+                      <option value="UTC" selected={f[:timezone].value == "UTC"}>UTC</option>
+                    </select>
+                  </div>
+                  <div class="space-y-1">
+                    <label class="block text-sm font-medium text-[var(--fq-color-text-main)]">Sprache</label>
+                    <select
+                      name="user[locale]"
+                      class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
+                    >
+                      <option value="de" selected={f[:locale].value == "de"}>Deutsch (DE)</option>
+                      <option value="en" selected={f[:locale].value == "en"}>English (EN)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <.button type="submit">
+                  Profil speichern
+                </.button>
+              </.form>
+            </.gh_box>
+          </div>
+
+          <%!-- TAB 2 (:account): Primäre E-Mail, Aktive Sitzung & Gefahrenzone --%>
+          <div class={[@active_tab != :account && "hidden", "space-y-6"]}>
+            <.gh_subhead>
+              <:title>2. Primäre E-Mail-Adresse</:title>
+              <:description>
+                Ihre E-Mail dient als primärer Anmeldeanker und für wichtige Systembenachrichtigungen.
+              </:description>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-6 space-y-4">
+              <div class="max-w-lg space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-[var(--fq-color-text-main)]">Aktuelle Adresse</span>
+                  <%= if @current_user.email_confirmed_at do %>
+                    <.status_badge status={:verified} />
+                  <% else %>
+                    <.status_badge status={:unverified} />
+                  <% end %>
+                </div>
+                <.input
+                  id="profile-email-display"
+                  name="email_display"
+                  type="email"
+                  value={to_string(@current_user.email)}
+                  readonly={true}
+                />
+
+                <%= if @current_user.pending_email do %>
+                  <div class="p-4 rounded-md bg-[#FFFBEB] border border-[#F59E0B] space-y-2">
+                    <div class="flex items-center justify-between text-xs text-[#92400E]">
+                      <span>Ausstehende Änderung auf: <strong class="fq-mono"><%= @current_user.pending_email %></strong></span>
+                      <span class="font-semibold">Wartet auf Bestätigung</span>
+                    </div>
+                    <div class="flex items-center gap-2 pt-1">
+                      <.button type="button" phx-click="confirm_email_change">
+                        Jetzt bestätigen (Verifizieren)
+                      </.button>
+                      <.button type="button" variant="secondary" phx-click="cancel_email_change">
+                        Abbrechen
+                      </.button>
+                    </div>
+                  </div>
+                <% else %>
+                  <div>
+                    <%= if @show_email_change_form do %>
+                      <.form :let={ef} for={@email_change_form} id="email-change-form" phx-submit="request_email_change" class="space-y-3 pt-2">
+                        <.input
+                          field={ef[:new_email]}
+                          type="email"
+                          label="Neue E-Mail-Adresse"
+                          placeholder="neue-adresse@example.com"
+                          required
+                        />
+                        <div class="flex items-center gap-2">
+                          <.button type="submit">
+                            Änderungslink anfordern
+                          </.button>
+                          <.button type="button" variant="ghost" phx-click="toggle_email_change">
+                            Abbrechen
+                          </.button>
+                        </div>
+                      </.form>
+                    <% else %>
+                      <.button type="button" variant="secondary" phx-click="toggle_email_change">
+                        E-Mail-Adresse ändern
+                      </.button>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+            </.gh_box>
+
+            <.gh_subhead>
+              <:title>7. Aktive Sitzung &amp; Abmeldung</:title>
+              <:description>
+                Sie sind aktuell im Faciqor Hub als <strong class="text-[var(--fq-color-text-main)]"><%= @current_user.email %></strong> angemeldet.
+              </:description>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <div class="text-xs font-semibold text-[var(--fq-color-text-main)] flex items-center gap-2">
+                  <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Aktive Browser-Sitzung</span>
+                </div>
+                <p class="text-xs text-[var(--fq-color-text-muted)]">
+                  Beendet Ihre aktuelle Browser-Sitzung und widerruft temporäre Session-Cookies.
+                </p>
+              </div>
+              <div>
+                <.link
+                  href={~p"/sign-out"}
+                  method="delete"
+                  id="profile-sign-out-btn"
+                  class="inline-flex items-center justify-center gap-2 rounded-md px-4 font-medium transition-colors h-11 lg:h-9 text-sm whitespace-nowrap bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[#FEF2F2] hover:text-[#DC2626] hover:border-[#EF4444] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-current">
+                    <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" />
+                    <path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l2.47-2.47a.75.75 0 10-1.06-1.06l-3.75 3.75a.75.75 0 000 1.06l3.75 3.75a.75.75 0 101.06-1.06l-2.47-2.47H18.25A.75.75 0 0019 10z" clip-rule="evenodd" />
+                  </svg>
+                  <span>Vom System abmelden</span>
+                </.link>
+              </div>
+            </.gh_box>
+
+            <%!-- Danger Zone (60-Day Soft Delete) --%>
+            <div class="space-y-3 pt-2">
+              <h2 class="text-base font-bold text-[#991B1B]">
+                8. Gefahrenzone – Konto löschen (60-Tage-Soft-Delete)
+              </h2>
+              <.gh_danger_zone>
+                <div class="p-6 space-y-4">
+                  <div :if={@orphaned_orgs != []} class="p-4 rounded-md bg-[#FEF2F2] border border-[#EF4444] text-xs text-[#991B1B] space-y-1">
+                    <p class="font-semibold">
+                      Achtung: Sie sind der letzte Eigentümer der folgenden Organisationen:
+                      <span class="fq-mono">
+                        [<%= Enum.map_join(@orphaned_orgs, ", ", &("@" <> to_string(&1.handle))) %>]
+                      </span>.
+                    </p>
+                    <p>
+                      Diese Organisationen und alle zugehörigen Daten werden nach Ablauf der 60-tägigen Wiederherstellungsfrist ebenfalls unwiderruflich gelöscht.
+                    </p>
+                  </div>
+
+                  <form id="delete-account-form" phx-change="update_delete_confirm" phx-submit="request_account_deletion" class="space-y-4 max-w-lg">
+                    <.input
+                      id="confirm-delete-handle"
+                      name="confirm_handle"
+                      label={"Bitte geben Sie zur Bestätigung Ihr Handle (#{@current_user.handle}) ein"}
+                      monospace={true}
+                      value={@delete_confirm_handle}
+                      placeholder={to_string(@current_user.handle)}
+                    />
+                    <.button
+                      type="submit"
+                      variant="danger"
+                      disabled={String.downcase(String.trim(@delete_confirm_handle)) != String.downcase(to_string(@current_user.handle))}
+                    >
+                      Konto zur Löschung vormerken (60 Tage Frist)
                     </.button>
-                    <.button type="button" variant="ghost" phx-click="toggle_email_change">
-                      Abbrechen
+                  </form>
+                </div>
+              </.gh_danger_zone>
+            </div>
+          </div>
+
+          <%!-- TAB 3 (:security): Kennwort & SSO --%>
+          <div class={[@active_tab != :security && "hidden", "space-y-6"]}>
+            <.gh_subhead>
+              <:title>3. Kennwort &amp; Sicherheit</:title>
+              <:description>
+                <%= if @current_user.hashed_password do %>
+                  Ändern Sie Ihr persönliches Passwort für den direkten Web-Login.
+                <% else %>
+                  Sie haben sich bisher passwortlos angemeldet. Hier können Sie ein Kennwort festlegen.
+                <% end %>
+              </:description>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-6">
+              <.form :let={pf} for={@password_form} id="password-form" phx-change="validate_password" phx-submit="change_password" class="space-y-4 max-w-lg">
+                <div :if={@current_user.hashed_password}>
+                  <.input
+                    field={pf[:current_password]}
+                    type="password"
+                    label="Aktuelles Passwort"
+                    required
+                  />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <.input
+                    field={pf[:password]}
+                    type="password"
+                    label="Neues Passwort (min. 8 Zeichen)"
+                    required
+                  />
+                  <.input
+                    field={pf[:password_confirmation]}
+                    type="password"
+                    label="Passwort bestätigen"
+                    required
+                  />
+                </div>
+
+                <.button type="submit">
+                  <%= if @current_user.hashed_password, do: "Kennwort aktualisieren", else: "Kennwort festlegen" %>
+                </.button>
+              </.form>
+            </.gh_box>
+
+            <.gh_subhead>
+              <:title>4. Verknüpfte Anmeldedienste (SSO)</:title>
+              <:description>
+                Übersicht über verbundene Drittanbieter-Identitäten zur schnellen Anmeldung.
+              </:description>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <span class="font-medium text-sm text-[var(--fq-color-text-main)]">Google Workspace / Google Konto</span>
+                </div>
+                <%= if @has_google_identity do %>
+                  <.status_badge status={:verified} />
+                <% else %>
+                  <span class="text-xs text-[var(--fq-color-text-muted)] italic">Nicht verknüpft</span>
+                <% end %>
+              </div>
+            </.gh_box>
+          </div>
+
+          <%!-- TAB 4 (:organizations): Meine Mandanten & Mitgliedschaften --%>
+          <div class={[@active_tab != :organizations && "hidden", "space-y-6"]}>
+            <.gh_subhead>
+              <:title>6. Meine Mandanten &amp; Mitgliedschaften</:title>
+              <:description>
+                Übersicht aller Organisationen, zu denen Ihr Benutzerkonto Zugang hat.
+              </:description>
+              <:actions>
+                <a
+                  href={~p"/orgs/new"}
+                  class="inline-flex items-center justify-center rounded-md px-3 font-medium h-9 text-xs bg-[var(--fq-color-primary)] text-white hover:bg-[var(--fq-color-primary-hover)] transition-colors"
+                >
+                  + Neue Organisation gründen
+                </a>
+              </:actions>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-0">
+              <%= if @user_orgs == [] do %>
+                <div class="p-6 text-xs italic text-[var(--fq-color-text-muted)]">
+                  Sie sind derzeit noch keiner Organisation zugeordnet.
+                </div>
+              <% else %>
+                <div class="divide-y divide-[var(--fq-color-border)]">
+                  <div :for={org <- @user_orgs} class="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-[var(--fq-color-bg-app)] transition-colors">
+                    <div>
+                      <div class="font-medium text-sm text-[var(--fq-color-text-main)] flex items-center gap-2">
+                        <span class="fq-mono font-semibold">@<%= org.handle %></span>
+                        <span :if={org.display_name} class="text-[var(--fq-color-text-muted)] text-xs">
+                          (<%= org.display_name %>)
+                        </span>
+                      </div>
+                      <div class="text-xs text-[var(--fq-color-text-muted)]">
+                        Fokus: <%= org.primary_focus %>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <.status_badge status={org_role(org, @current_user.id)} />
+                      <a
+                        href={~p"/orgs/#{org.handle}/facilities"}
+                        class="text-xs font-medium text-[var(--fq-color-text-main)] hover:underline"
+                      >
+                        Objekte
+                      </a>
+                      <a
+                        href={~p"/orgs/#{org.handle}/settings"}
+                        class="text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
+                      >
+                        Einstellungen &rarr;
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+            </.gh_box>
+          </div>
+
+          <%!-- TAB 5 (:tokens): Personal Access Tokens (Go-CLI & gRPC) --%>
+          <div class={[@active_tab != :tokens && "hidden", "space-y-6"]}>
+            <.gh_subhead>
+              <:title>5. Personal Access Tokens (Go-CLI &amp; gRPC)</:title>
+              <:description>
+                Token für den authentifizierten Zugriff über die <span class="fq-mono">faciqor</span> Standalone-CLI und gRPC-Endpunkte.
+              </:description>
+            </.gh_subhead>
+
+            <.gh_box body_class="p-6 space-y-4">
+              <%= if is_nil(@current_user.email_confirmed_at) do %>
+                <div class="p-3 rounded-md bg-[#FFFBEB] border border-[#F59E0B] text-xs text-[#92400E]">
+                  Verifizieren Sie zuerst Ihre E-Mail-Adresse, um den CLI-Zugang freizuschalten.
+                </div>
+              <% end %>
+
+              <div :if={@newly_created_plain_token} class="p-4 rounded-md bg-[#ECFDF5] border border-[#10B981] space-y-2">
+                <p class="text-xs font-semibold text-[#065F46]">
+                  Bitte kopieren Sie Ihr neues Token jetzt. Es wird aus Sicherheitsgründen nur einmalig im Klartext angezeigt:
+                </p>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1 p-2 rounded bg-white border border-[#6EE7B7] fq-mono text-xs select-all overflow-x-auto">
+                    <%= @newly_created_plain_token %>
+                  </div>
+                  <button
+                    type="button"
+                    id="copy-token-btn"
+                    phx-hook="CopyToClipboard"
+                    data-clipboard-text={@newly_created_plain_token}
+                    class="px-3 py-2 text-xs font-medium rounded bg-[#065F46] text-white hover:bg-[#044E39] transition-colors"
+                  >
+                    Kopieren
+                  </button>
+                </div>
+                <p class="text-xs text-[#065F46] pt-1">CLI-Anmeldebefehl:</p>
+                <div class="flex items-center gap-2">
+                  <code class="flex-1 block p-2 rounded bg-white border border-[#6EE7B7] fq-mono text-xs select-all overflow-x-auto">
+                    faciqor auth login --token <%= @newly_created_plain_token %>
+                  </code>
+                  <button
+                    type="button"
+                    id="copy-cli-btn"
+                    phx-hook="CopyToClipboard"
+                    data-clipboard-text={"faciqor auth login --token " <> @newly_created_plain_token}
+                    class="px-3 py-2 text-xs font-medium rounded bg-[#065F46] text-white hover:bg-[#044E39] transition-colors"
+                  >
+                    Kopieren
+                  </button>
+                </div>
+              </div>
+
+              <form id="pat-form" phx-submit="create_pat" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <.input
+                      id="new-token-name"
+                      name="name"
+                      label="Token-Bezeichnung"
+                      placeholder="z. B. Workstation CLI"
+                      value={@new_token_name}
+                      readonly={is_nil(@current_user.email_confirmed_at)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-[var(--fq-color-text-main)] mb-1">Berechtigung</label>
+                    <select
+                      name="scopes"
+                      disabled={is_nil(@current_user.email_confirmed_at)}
+                      class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
+                    >
+                      <option value="all" selected>Vollzugriff (all)</option>
+                      <option value="read_only">Nur Leserechte (read_only)</option>
+                      <option value="cli">CLI &amp; Operationen (cli)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-[var(--fq-color-text-main)] mb-1">Gültigkeit</label>
+                    <select
+                      name="expires_in_days"
+                      disabled={is_nil(@current_user.email_confirmed_at)}
+                      class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
+                    >
+                      <option value="30">30 Tage</option>
+                      <option value="90">90 Tage</option>
+                      <option value="180">180 Tage</option>
+                      <option value="365" selected>1 Jahr (365 Tage)</option>
+                      <option value="0">Kein Ablaufdatum</option>
+                    </select>
+                  </div>
+                  <div>
+                    <.button type="submit" disabled={is_nil(@current_user.email_confirmed_at)} class="w-full">
+                      Token erstellen
                     </.button>
                   </div>
-                </.form>
-              <% else %>
-                <.button type="button" variant="secondary" phx-click="toggle_email_change">
-                  E-Mail-Adresse ändern
-                </.button>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
-      </section>
-
-      <%!-- Card 3: Kennwort & Authentifizierung --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">3. Kennwort &amp; Sicherheit</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            <%= if @current_user.hashed_password do %>
-              Ändern Sie Ihr persönliches Passwort für den direkten Web-Login.
-            <% else %>
-              Sie haben sich bisher passwortlos angemeldet. Hier können Sie ein Kennwort festlegen.
-            <% end %>
-          </p>
-        </div>
-
-        <.form :let={pf} for={@password_form} id="password-form" phx-change="validate_password" phx-submit="change_password" class="space-y-4 max-w-lg">
-          <div :if={@current_user.hashed_password}>
-            <.input
-              field={pf[:current_password]}
-              type="password"
-              label="Aktuelles Passwort"
-              required
-            />
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <.input
-              field={pf[:password]}
-              type="password"
-              label="Neues Passwort (min. 8 Zeichen)"
-              required
-            />
-            <.input
-              field={pf[:password_confirmation]}
-              type="password"
-              label="Passwort bestätigen"
-              required
-            />
-          </div>
-
-          <.button type="submit">
-            <%= if @current_user.hashed_password, do: "Kennwort aktualisieren", else: "Kennwort festlegen" %>
-          </.button>
-        </.form>
-      </section>
-
-      <%!-- Card 4: Verknüpfte Konten (SSO) --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">4. Verknüpfte Anmeldedienste (SSO)</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Übersicht über verbundene Drittanbieter-Identitäten zur schnellen Anmeldung.
-          </p>
-        </div>
-
-        <div class="divide-y divide-[var(--fq-color-border)] max-w-lg">
-          <div class="py-3 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <span class="font-medium text-sm text-[var(--fq-color-text-main)]">Google Workspace / Google Konto</span>
-            </div>
-            <%= if @has_google_identity do %>
-              <.status_badge status={:verified} />
-            <% else %>
-              <span class="text-xs text-[var(--fq-color-text-muted)] italic">Nicht verknüpft</span>
-            <% end %>
-          </div>
-        </div>
-      </section>
-
-      <%!-- Card 5: Personal Access Tokens (Go-CLI & gRPC) --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">5. Personal Access Tokens (Go-CLI &amp; gRPC)</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Token für den authentifizierten Zugriff über die <span class="fq-mono">faciqor</span> Standalone-CLI und gRPC-Endpunkte.
-          </p>
-        </div>
-
-        <%= if is_nil(@current_user.email_confirmed_at) do %>
-          <div class="p-3 rounded-md bg-[#FFFBEB] border border-[#F59E0B] text-xs text-[#92400E]">
-            Verifizieren Sie zuerst Ihre E-Mail-Adresse, um den CLI-Zugang freizuschalten.
-          </div>
-        <% end %>
-
-        <div :if={@newly_created_plain_token} class="p-4 rounded-md bg-[#ECFDF5] border border-[#10B981] space-y-2">
-          <p class="text-xs font-semibold text-[#065F46]">
-            Bitte kopieren Sie Ihr neues Token jetzt. Es wird aus Sicherheitsgründen nur einmalig im Klartext angezeigt:
-          </p>
-          <div class="flex items-center gap-2">
-            <div class="flex-1 p-2 rounded bg-white border border-[#6EE7B7] fq-mono text-xs select-all overflow-x-auto">
-              <%= @newly_created_plain_token %>
-            </div>
-            <button
-              type="button"
-              id="copy-token-btn"
-              phx-hook="CopyToClipboard"
-              data-clipboard-text={@newly_created_plain_token}
-              class="px-3 py-2 text-xs font-medium rounded bg-[#065F46] text-white hover:bg-[#044E39] transition-colors"
-            >
-              Kopieren
-            </button>
-          </div>
-          <p class="text-xs text-[#065F46] pt-1">CLI-Anmeldebefehl:</p>
-          <div class="flex items-center gap-2">
-            <code class="flex-1 block p-2 rounded bg-white border border-[#6EE7B7] fq-mono text-xs select-all overflow-x-auto">
-              faciqor auth login --token <%= @newly_created_plain_token %>
-            </code>
-            <button
-              type="button"
-              id="copy-cli-btn"
-              phx-hook="CopyToClipboard"
-              data-clipboard-text={"faciqor auth login --token " <> @newly_created_plain_token}
-              class="px-3 py-2 text-xs font-medium rounded bg-[#065F46] text-white hover:bg-[#044E39] transition-colors"
-            >
-              Kopieren
-            </button>
-          </div>
-        </div>
-
-        <form id="pat-form" phx-submit="create_pat" class="space-y-3 max-w-3xl">
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
-            <div>
-              <.input
-                id="new-token-name"
-                name="name"
-                label="Token-Bezeichnung"
-                placeholder="z. B. Workstation CLI"
-                value={@new_token_name}
-                readonly={is_nil(@current_user.email_confirmed_at)}
-                required
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-[var(--fq-color-text-main)] mb-1">Berechtigung</label>
-              <select
-                name="scopes"
-                disabled={is_nil(@current_user.email_confirmed_at)}
-                class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
-              >
-                <option value="all" selected>Vollzugriff (all)</option>
-                <option value="read_only">Nur Leserechte (read_only)</option>
-                <option value="cli">CLI &amp; Operationen (cli)</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-[var(--fq-color-text-main)] mb-1">Gültigkeit</label>
-              <select
-                name="expires_in_days"
-                disabled={is_nil(@current_user.email_confirmed_at)}
-                class="block w-full h-11 lg:h-9 px-3 text-sm border rounded-md bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border-[var(--fq-color-border-strong)]"
-              >
-                <option value="30">30 Tage</option>
-                <option value="90">90 Tage</option>
-                <option value="180">180 Tage</option>
-                <option value="365" selected>1 Jahr (365 Tage)</option>
-                <option value="0">Kein Ablaufdatum</option>
-              </select>
-            </div>
-            <div>
-              <.button type="submit" disabled={is_nil(@current_user.email_confirmed_at)} class="w-full">
-                Token erstellen
-              </.button>
-            </div>
-          </div>
-        </form>
-
-        <.table :if={@api_tokens != []} id="api-tokens-table" rows={@api_tokens}>
-          <:col :let={token} label="Bezeichnung">
-            <div class="font-medium"><%= token.name %></div>
-            <div class="text-xs fq-mono text-[var(--fq-color-text-muted)]">
-              <%= token.token_prefix || "fq_pat_..." %>****
-            </div>
-          </:col>
-          <:col :let={token} label="Erstellt am" numeric={true}>
-            <%= Calendar.strftime(token.inserted_at, "%d.%m.%Y %H:%M") %>
-          </:col>
-          <:col :let={token} label="Gültig bis" numeric={true}>
-            <%= if token.expires_at, do: Calendar.strftime(token.expires_at, "%d.%m.%Y"), else: "Unbegrenzt" %>
-          </:col>
-          <:col :let={token} label="Zuletzt genutzt" numeric={true}>
-            <%= if token.last_used_at, do: Calendar.strftime(token.last_used_at, "%d.%m.%Y %H:%M"), else: "Noch nie" %>
-          </:col>
-          <:col :let={token} label="Status">
-            <%= if token_expired?(token) do %>
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFFBEB] text-[#92400E]">
-                Abgelaufen
-              </span>
-            <% else %>
-              <.status_badge status={:verified} />
-            <% end %>
-          </:col>
-          <:action :let={token}>
-            <.button
-              type="button"
-              variant="secondary"
-              phx-click="revoke_pat"
-              phx-value-id={token.id}
-            >
-              Widerrufen
-            </.button>
-          </:action>
-        </.table>
-      </section>
-
-      <%!-- Card 6: Meine Organisationen & Rollen --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">6. Meine Mandanten &amp; Mitgliedschaften</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Übersicht aller Organisationen, zu denen Ihr Benutzerkonto Zugang hat.
-          </p>
-        </div>
-
-        <%= if @user_orgs == [] do %>
-          <p class="text-xs italic text-[var(--fq-color-text-muted)]">
-            Sie sind derzeit noch keiner Organisation zugeordnet.
-          </p>
-        <% else %>
-          <div class="divide-y divide-[var(--fq-color-border)]">
-            <div :for={org <- @user_orgs} class="py-3 flex items-center justify-between">
-              <div>
-                <div class="font-medium text-sm text-[var(--fq-color-text-main)] flex items-center gap-2">
-                  <span class="fq-mono font-semibold">@<%= org.handle %></span>
-                  <span :if={org.display_name} class="text-[var(--fq-color-text-muted)] text-xs">
-                    (<%= org.display_name %>)
-                  </span>
                 </div>
-                <div class="text-xs text-[var(--fq-color-text-muted)]">
-                  Fokus: <%= org.primary_focus %>
-                </div>
-              </div>
-              <div class="flex items-center gap-3">
-                <.status_badge status={org_role(org, @current_user.id)} />
-                <a
-                  href={~p"/orgs/#{org.handle}/settings"}
-                  class="text-xs font-medium text-[var(--fq-color-primary)] hover:underline"
-                >
-                  Einstellungen &rarr;
-                </a>
-              </div>
-            </div>
-          </div>
-        <% end %>
-      </section>
+              </form>
 
-      <%!-- Card 7: Aktive Sitzung & Abmeldung --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border border-[var(--fq-color-border)] rounded-lg p-6 space-y-4">
-        <div>
-          <h2 class="text-base font-bold text-[var(--fq-color-text-main)]">7. Aktive Sitzung &amp; Abmeldung</h2>
-          <p class="text-xs text-[var(--fq-color-text-muted)]">
-            Sie sind aktuell im Faciqor Hub als <strong class="text-[var(--fq-color-text-main)]"><%= @current_user.email %></strong> angemeldet.
-          </p>
-        </div>
-
-        <div class="p-4 rounded-lg bg-[var(--fq-color-bg-muted)] border border-[var(--fq-color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="space-y-1">
-            <div class="text-xs font-semibold text-[var(--fq-color-text-main)] flex items-center gap-2">
-              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Aktive Browser-Sitzung</span>
-            </div>
-            <p class="text-xs text-[var(--fq-color-text-muted)]">
-              Beendet Ihre aktuelle Browser-Sitzung und widerruft temporäre Session-Cookies.
-            </p>
-          </div>
-          <div>
-            <.link
-              href={~p"/sign-out"}
-              method="delete"
-              id="profile-sign-out-btn"
-              class="inline-flex items-center justify-center gap-2 rounded-md px-4 font-medium transition-colors h-11 lg:h-9 text-sm whitespace-nowrap bg-[var(--fq-color-bg-surface)] text-[var(--fq-color-text-main)] border border-[var(--fq-color-border-strong)] hover:bg-[#FEF2F2] hover:text-[#DC2626] hover:border-[#EF4444] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563EB] focus-visible:ring-offset-1"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-current">
-                <path fill-rule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clip-rule="evenodd" />
-                <path fill-rule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l2.47-2.47a.75.75 0 10-1.06-1.06l-3.75 3.75a.75.75 0 000 1.06l3.75 3.75a.75.75 0 101.06-1.06l-2.47-2.47H18.25A.75.75 0 0019 10z" clip-rule="evenodd" />
-              </svg>
-              <span>Vom System abmelden</span>
-            </.link>
+              <.table :if={@api_tokens != []} id="api-tokens-table" rows={@api_tokens}>
+                <:col :let={token} label="Bezeichnung">
+                  <div class="font-medium"><%= token.name %></div>
+                  <div class="text-xs fq-mono text-[var(--fq-color-text-muted)]">
+                    <%= token.token_prefix || "fq_pat_..." %>****
+                  </div>
+                </:col>
+                <:col :let={token} label="Erstellt am" numeric={true}>
+                  <%= Calendar.strftime(token.inserted_at, "%d.%m.%Y %H:%M") %>
+                </:col>
+                <:col :let={token} label="Gültig bis" numeric={true}>
+                  <%= if token.expires_at, do: Calendar.strftime(token.expires_at, "%d.%m.%Y"), else: "Unbegrenzt" %>
+                </:col>
+                <:col :let={token} label="Zuletzt genutzt" numeric={true}>
+                  <%= if token.last_used_at, do: Calendar.strftime(token.last_used_at, "%d.%m.%Y %H:%M"), else: "Noch nie" %>
+                </:col>
+                <:col :let={token} label="Status">
+                  <%= if token_expired?(token) do %>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFFBEB] text-[#92400E]">
+                      Abgelaufen
+                    </span>
+                  <% else %>
+                    <.status_badge status={:verified} />
+                  <% end %>
+                </:col>
+                <:action :let={token}>
+                  <.button
+                    type="button"
+                    variant="secondary"
+                    phx-click="revoke_pat"
+                    phx-value-id={token.id}
+                  >
+                    Widerrufen
+                  </.button>
+                </:action>
+              </.table>
+            </.gh_box>
           </div>
         </div>
-      </section>
-
-      <%!-- Card 8: Danger Zone (60-Day Soft Delete) --%>
-      <section class="bg-[var(--fq-color-bg-surface)] border-2 border-[var(--fq-status-danger)] rounded-lg p-6 space-y-4">
-        <h2 class="text-base font-bold text-[#991B1B]">8. Gefahrenzone – Konto löschen (60-Tage-Soft-Delete)</h2>
-
-        <div :if={@orphaned_orgs != []} class="p-4 rounded-md bg-[#FEF2F2] border border-[#EF4444] text-xs text-[#991B1B] space-y-1">
-          <p class="font-semibold">
-            Achtung: Sie sind der letzte Eigentümer der folgenden Organisationen:
-            <span class="fq-mono">
-              [<%= Enum.map_join(@orphaned_orgs, ", ", &("@" <> to_string(&1.handle))) %>]
-            </span>.
-          </p>
-          <p>
-            Diese Organisationen und alle zugehörigen Daten werden nach Ablauf der 60-tägigen Wiederherstellungsfrist ebenfalls unwiderruflich gelöscht.
-          </p>
-        </div>
-
-        <form id="delete-account-form" phx-change="update_delete_confirm" phx-submit="request_account_deletion" class="space-y-4 max-w-lg">
-          <.input
-            id="confirm-delete-handle"
-            name="confirm_handle"
-            label={"Bitte geben Sie zur Bestätigung Ihr Handle (#{@current_user.handle}) ein"}
-            monospace={true}
-            value={@delete_confirm_handle}
-            placeholder={to_string(@current_user.handle)}
-          />
-          <.button
-            type="submit"
-            variant="danger"
-            disabled={String.downcase(String.trim(@delete_confirm_handle)) != String.downcase(to_string(@current_user.handle))}
-          >
-            Konto zur Löschung vormerken (60 Tage Frist)
-          </.button>
-        </form>
-      </section>
+      </div>
     </div>
     """
   end
